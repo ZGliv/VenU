@@ -1,0 +1,35 @@
+# VenU Project Rules
+
+## 1. Design & Aesthetic (CRITICAL)
+- **Visual Style**: "Noona-like", "Apple-esque", clean, high-end, minimalist.
+- **Philosophy**: "Start from scratch" quality. Never output "placeholder" looking UI.
+- **Components**: ALWAYS use existing Shadcn UI components from `@/components/ui` when possible.
+- **Icons**: Use `lucide-react` for icons.
+- **Typography**: Clean, readable sans-serif (Inter). Use varied font weights (medium/semibold) for hierarchy, not just size.
+- **Spacing**: Generous whitespace. Use Tailwind's spacing scale (p-4, p-6, p-8).
+- **NO EMOJIS**: Do not use emojis in UI text, comments, or documentation. Use Lucid icons if a visual is needed.
+
+## 2. Tech Stack & patterns
+- **Framework**: Next.js 14+ (App Router). Use Server Components by default.
+- **Database**: Supabase. Use `createClient` from `@/lib/supabase/server` for server-side and `@/lib/supabase/client` for client-side.
+- **Styling**: Tailwind CSS. Use `cn()` utility for class merging.
+- **Language**: TypeScript. Strict typing. No `any`.
+
+## 3. Documentation Habits
+- **Sustainable Docs**: If a major architectural change happens, update the File Structure in `docs/ARCHITECTURE.md`.
+- **Schema**: If the DB schema changes, update the Database Tree in `docs/ARCHITECTURE.md`.
+- **Cleanliness**: Documentation should be professional, developer-focused, and emoji-free.
+
+## 4. Code Quality
+- **Comments**: Explain "WHY", not "WHAT".
+- **File Structure**:
+    - `app/`: Routes and pages only.
+    - `components/ui/`: Generic UI (buttons, inputs).
+    - `components/features/`: Domain specific (e.g., `booking-card.tsx`).
+    - `lib/`: Utilities and helpers.
+- **Error Handling**: Always handle Supabase errors gracefully. Don't just `console.log`.
+
+## 5. "VenU" Context
+- This is a multi-tenant campus marketplace.
+- Users are "Students" or "Providers" (Venue Owners).
+- Data is often filtered by `campus` column.
