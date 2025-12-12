@@ -3,22 +3,27 @@
  * 
  * Development panel for testing different user roles.
  * Visible in development mode OR for admin users in production.
- * Allows switching between:
+ * 
+ * Behavior:
+ * - In DEVELOPMENT: Actually switches user role in database (for testing)
+ * - In PRODUCTION (admin only): "View As" mode - navigates to dashboards without changing role
+ * 
+ * Allows viewing/switching between:
  * - Student (customer view)
  * - Provider (venue_owner view)
  * - Admin (platform management view)
  * 
  * Features:
  * - Floating panel with toggle
- * - Quick role switching with navigation to role dashboards
- * - Current role indicator
+ * - Quick navigation to role dashboards
+ * - Current role/view indicator
  * - Admin-only visibility in production (for secure demos)
  */
 
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -29,9 +34,9 @@ import {
   Store,
   Shield,
   ChevronUp,
-  ChevronDown,
   Loader2,
   RefreshCw,
+  Eye,
 } from "lucide-react";
 
 // Role configuration with labels, colors, and dashboard paths
@@ -44,6 +49,7 @@ const roles = [
     color: "bg-blue-500",
     lightColor: "bg-blue-100 text-blue-700",
     href: "/",
+    pathPrefix: "", // Root paths
   },
   {
     value: "venue_owner",
@@ -53,6 +59,7 @@ const roles = [
     color: "bg-amber-500",
     lightColor: "bg-amber-100 text-amber-700",
     href: "/provider",
+    pathPrefix: "/provider",
   },
   {
     value: "admin",
@@ -62,6 +69,7 @@ const roles = [
     color: "bg-red-500",
     lightColor: "bg-red-100 text-red-700",
     href: "/admin",
+    pathPrefix: "/admin",
   },
 ] as const;
 
@@ -70,10 +78,11 @@ type RoleValue = (typeof roles)[number]["value"];
 /**
  * DevPanel component.
  * Floating development panel for role switching during testing.
- * Only renders in development environment.
+ * In production, admins can "view as" other roles without changing their actual role.
  */
 export function DevPanel() {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, profile, refreshProfile, loading: authLoading } = useAuth();
   // Memoize Supabase client to prevent recreation on every render
   const supabase = useMemo(() => createClient(), []);
@@ -82,8 +91,22 @@ export function DevPanel() {
   const [switching, setSwitching] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Get current role configuration
+  // Check if we're in production
+  const isProduction = process.env.NODE_ENV === "production";
+  
+  // Check if user is admin
+  const isAdmin = profile?.role === "admin";
+
+  // Get current role configuration (actual database role)
   const currentRole = roles.find((r) => r.value === profile?.role) || roles[0];
+
+  // Determine which view we're currently on based on the URL path
+  const getCurrentView = () => {
+    if (pathname?.startsWith("/admin")) return roles.find(r => r.value === "admin");
+    if (pathname?.startsWith("/provider")) return roles.find(r => r.value === "venue_owner");
+    return roles.find(r => r.value === "student");
+  };
+  const currentView = getCurrentView() || roles[0];
 
   // Close panel when clicking outside
   useEffect(() => {
@@ -102,41 +125,45 @@ export function DevPanel() {
     };
   }, [isOpen]);
 
-  // Only show dev panel to admin users (allows role switching for demos)
-  // In development, always show. In production, only show if user is admin.
-  const isAdmin = profile?.role === "admin";
-  const showDevPanel = process.env.NODE_ENV === "development" || isAdmin;
+  // Only show dev panel to admin users in production, or always in development
+  const showDevPanel = !isProduction || isAdmin;
   
   if (!showDevPanel) {
     return null;
   }
 
   /**
-   * Switches the current user's role in the database.
-   * Updates the users table and refreshes the profile.
-   * Navigates to the appropriate dashboard for the selected role.
+   * Handles clicking a role button.
+   * - In production (admin): Just navigates to the dashboard (view-only mode)
+   * - In development: Actually changes the role in the database
    */
-  const handleRoleSwitch = async (newRole: RoleValue) => {
+  const handleRoleClick = async (targetRole: RoleValue) => {
     if (!user || switching) return;
 
-    // Get the role configuration for navigation
-    const roleConfig = roles.find((r) => r.value === newRole);
+    const roleConfig = roles.find((r) => r.value === targetRole);
+    if (!roleConfig) return;
 
-    // If already this role, just navigate to the dashboard
-    if (profile?.role === newRole) {
-      if (roleConfig) {
-        router.push(roleConfig.href);
-      }
+    // In production, admins just navigate without changing role
+    if (isProduction && isAdmin) {
+      router.push(roleConfig.href);
+      setIsOpen(false);
+      return;
+    }
+
+    // In development, actually switch the role in the database
+    // If already this role, just navigate
+    if (profile?.role === targetRole) {
+      router.push(roleConfig.href);
       return;
     }
 
     setSwitching(true);
 
     try {
-      // Update role in database
+      // Update role in database (development only)
       const { error } = await supabase
         .from("users")
-        .update({ role: newRole })
+        .update({ role: targetRole })
         .eq("id", user.id);
 
       if (error) {
@@ -148,10 +175,8 @@ export function DevPanel() {
       // Refresh profile to get new role
       await refreshProfile();
 
-      // Navigate to appropriate dashboard for the new role
-      if (roleConfig) {
-        router.push(roleConfig.href);
-      }
+      // Navigate to appropriate dashboard
+      router.push(roleConfig.href);
     } catch (err) {
       console.error("Error switching role:", err);
     } finally {
@@ -175,6 +200,12 @@ export function DevPanel() {
             <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
               <Code className="h-5 w-5 text-violet-600" />
               <span className="font-semibold text-foreground">Dev Panel</span>
+              {isProduction && isAdmin && (
+                <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 flex items-center gap-1">
+                  <Eye className="h-3 w-3" />
+                  View Mode
+                </span>
+              )}
               {switching && (
                 <Loader2 className="h-4 w-4 animate-spin ml-auto text-muted-foreground" />
               )}
@@ -211,9 +242,19 @@ export function DevPanel() {
                       <p className="text-sm font-medium text-foreground truncate">
                         {profile?.name || "User"}
                       </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {user.email}
-                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <span className={cn(
+                          "text-xs px-1.5 py-0.5 rounded",
+                          currentRole.lightColor
+                        )}>
+                          {currentRole.label}
+                        </span>
+                        {isProduction && isAdmin && currentView.value !== "admin" && (
+                          <span className="text-xs text-muted-foreground">
+                            viewing {currentView.label}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <Button
                       variant="ghost"
@@ -227,23 +268,27 @@ export function DevPanel() {
                   </div>
                 </div>
 
-                {/* Role Switcher */}
+                {/* View/Role Switcher */}
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Switch Role
+                    {isProduction && isAdmin ? "View As" : "Switch Role"}
                   </p>
                   {roles.map((role) => {
-                    const isCurrentRole = profile?.role === role.value;
+                    // In production view mode, highlight based on current URL path
+                    // In development, highlight based on actual database role
+                    const isActiveView = isProduction && isAdmin 
+                      ? currentView.value === role.value
+                      : profile?.role === role.value;
                     const Icon = role.icon;
 
                     return (
                       <button
                         key={role.value}
-                        onClick={() => handleRoleSwitch(role.value)}
+                        onClick={() => handleRoleClick(role.value)}
                         disabled={switching}
                         className={cn(
                           "w-full flex items-center gap-3 p-3 rounded-lg transition-all text-left",
-                          isCurrentRole
+                          isActiveView
                             ? "bg-gray-100 ring-2 ring-gray-200"
                             : "hover:bg-gray-50"
                         )}
@@ -251,13 +296,13 @@ export function DevPanel() {
                         <div
                           className={cn(
                             "h-8 w-8 rounded-lg flex items-center justify-center",
-                            isCurrentRole ? role.color : "bg-gray-100"
+                            isActiveView ? role.color : "bg-gray-100"
                           )}
                         >
                           <Icon
                             className={cn(
                               "h-4 w-4",
-                              isCurrentRole ? "text-white" : "text-gray-500"
+                              isActiveView ? "text-white" : "text-gray-500"
                             )}
                           />
                         </div>
@@ -266,16 +311,16 @@ export function DevPanel() {
                             <span
                               className={cn(
                                 "text-sm font-medium",
-                                isCurrentRole
+                                isActiveView
                                   ? "text-foreground"
                                   : "text-muted-foreground"
                               )}
                             >
                               {role.label}
                             </span>
-                            {isCurrentRole && (
+                            {isActiveView && (
                               <span className="text-xs px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">
-                                Active
+                                {isProduction && isAdmin ? "Viewing" : "Active"}
                               </span>
                             )}
                           </div>
@@ -287,6 +332,13 @@ export function DevPanel() {
                     );
                   })}
                 </div>
+
+                {/* Info note for production view mode */}
+                {isProduction && isAdmin && (
+                  <p className="mt-4 text-xs text-muted-foreground text-center border-t border-gray-100 pt-3">
+                    Your role stays Admin. Click to view other dashboards.
+                  </p>
+                )}
               </>
             )}
           </div>
@@ -312,13 +364,17 @@ export function DevPanel() {
                 <div
                   className={cn(
                     "h-6 w-6 rounded-md flex items-center justify-center",
-                    currentRole.color
+                    isProduction && isAdmin ? currentView.color : currentRole.color
                   )}
                 >
-                  <currentRole.icon className="h-3.5 w-3.5 text-white" />
+                  {isProduction && isAdmin ? (
+                    <currentView.icon className="h-3.5 w-3.5 text-white" />
+                  ) : (
+                    <currentRole.icon className="h-3.5 w-3.5 text-white" />
+                  )}
                 </div>
                 <span className="text-sm font-medium text-foreground">
-                  {currentRole.label}
+                  {isProduction && isAdmin ? `Viewing: ${currentView.label}` : currentRole.label}
                 </span>
               </div>
               <ChevronUp className="h-4 w-4 text-muted-foreground" />
@@ -329,4 +385,3 @@ export function DevPanel() {
     </div>
   );
 }
-
