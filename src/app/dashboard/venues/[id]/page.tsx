@@ -195,7 +195,7 @@ export default async function VenuePage({
             </div>
           )}
 
-          <div className="flex flex-col lg:flex-row gap-8">
+          <div className="flex flex-col lg:flex-row gap-8 items-start">
             {/* Left Column: Services */}
             <div className="flex-1">
               {/* Services */}
@@ -246,9 +246,10 @@ export default async function VenuePage({
                 </div>
                     </div>
                 </div>
+            </div>
 
             {/* Right Column: Sidebar */}
-            <div className="w-full lg:w-80 flex-shrink-0">
+            <div className="w-full lg:w-80 flex-shrink-0 lg:pt-11">
               <div className="lg:sticky lg:top-24">
                 {/* Combined Provider & Quick Info Card */}
                 <Dialog>
