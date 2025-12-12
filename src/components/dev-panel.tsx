@@ -2,7 +2,8 @@
  * dev-panel.tsx
  * 
  * Development panel for testing different user roles.
- * Only visible in development mode. Allows switching between:
+ * Visible in development mode OR for admin users in production.
+ * Allows switching between:
  * - Student (customer view)
  * - Provider (venue_owner view)
  * - Admin (platform management view)
@@ -11,6 +12,7 @@
  * - Floating panel with toggle
  * - Quick role switching with navigation to role dashboards
  * - Current role indicator
+ * - Admin-only visibility in production (for secure demos)
  */
 
 "use client";
@@ -100,8 +102,12 @@ export function DevPanel() {
     };
   }, [isOpen]);
 
-  // Don't render in production - placed after hooks to follow rules of hooks
-  if (process.env.NODE_ENV === "production") {
+  // Only show dev panel to admin users (allows role switching for demos)
+  // In development, always show. In production, only show if user is admin.
+  const isAdmin = profile?.role === "admin";
+  const showDevPanel = process.env.NODE_ENV === "development" || isAdmin;
+  
+  if (!showDevPanel) {
     return null;
   }
 
