@@ -53,6 +53,16 @@ The application is multi-tenant by campus. Most data queries filter by the `camp
 VenU/
 ├── src/                                    # SOURCE CODE DIRECTORY
 │   ├── app/                                    # Next.js App Router (routes & pages)
+│   │   ├── admin/                                  # Admin management pages
+│   │   │   ├── layout.tsx                              # Admin layout with navigation
+│   │   │   ├── page.tsx                                # Admin dashboard overview
+│   │   │   ├── bookings/                               # Booking management
+│   │   │   │   └── page.tsx                              # All bookings list
+│   │   │   ├── users/                                  # User management
+│   │   │   │   └── page.tsx                              # User list and management
+│   │   │   └── venues/                                 # Venue management
+│   │   │       └── page.tsx                              # Venue approval/rejection with dialogs
+│   │   │
 │   │   ├── auth/                                   # Authentication routes
 │   │   │   ├── callback/                               # OAuth callback handler
 │   │   │   │   └── route.ts                             # Handles Supabase auth callbacks
@@ -63,7 +73,12 @@ VenU/
 │   │   │   └── new/                                    # Create new booking
 │   │   │       └── page.tsx                              # Booking creation form
 │   │   │
-│   │   ├── dashboard/                              # Dashboard area
+│   │   ├── dashboard/                              # User dashboard area
+│   │   │   ├── layout.tsx                              # Dashboard layout
+│   │   │   ├── bookings/                               # User bookings
+│   │   │   │   └── page.tsx                              # User's booking history
+│   │   │   ├── settings/                               # User settings
+│   │   │   │   └── page.tsx                              # Account settings page
 │   │   │   └── venues/                                 # Venue management
 │   │   │       ├── [id]/                                 # Dynamic route for venue details
 │   │   │       │   └── page.tsx                            # Individual venue view page
@@ -74,6 +89,26 @@ VenU/
 │   │   │   ├── explore-content.tsx                     # Explore page content component
 │   │   │   └── page.tsx                                # Main explore/discover page
 │   │   │
+│   │   ├── provider/                               # Provider dashboard area
+│   │   │   ├── layout.tsx                              # Provider layout
+│   │   │   ├── page.tsx                                # Provider dashboard home
+│   │   │   ├── availability/                           # Availability management
+│   │   │   │   └── page.tsx                              # Set weekly availability
+│   │   │   ├── bookings/                               # Provider bookings
+│   │   │   │   └── page.tsx                              # Incoming bookings management
+│   │   │   ├── onboarding/                             # Provider onboarding
+│   │   │   │   └── page.tsx                              # Setup wizard
+│   │   │   ├── settings/                               # Provider settings
+│   │   │   │   └── page.tsx                              # Business settings
+│   │   │   └── venues/                                 # Venue management
+│   │   │       ├── [id]/                                 # Dynamic venue route
+│   │   │       │   ├── page.tsx                            # Edit venue details
+│   │   │       │   └── services/                           # Service management
+│   │   │       │       └── page.tsx                          # Add/edit services
+│   │   │       ├── new/                                  # Create new venue
+│   │   │       │   └── page.tsx                            # New venue form
+│   │   │       └── page.tsx                              # Provider's venue list
+│   │   │
 │   │   ├── globals.css                             # Global styles and Tailwind imports
 │   │   ├── layout.tsx                              # Root layout wrapper (fonts, metadata)
 │   │   └── page.tsx                                # Landing/home page
@@ -82,8 +117,10 @@ VenU/
 │   │   ├── navbar.tsx                              # Main navigation bar component
 │   │   └── ui/                                     # Shadcn UI components
 │   │       ├── button.tsx                           # Button component
+│   │       ├── dialog.tsx                           # Dialog/modal component
 │   │       ├── dropdown-menu.tsx                    # Dropdown menu component
-│   │       └── input.tsx                            # Input field component
+│   │       ├── input.tsx                            # Input field component
+│   │       └── textarea.tsx                         # Textarea component
 │   │ 
 │   └── lib/                                    # Utility libraries and helpers
 │       ├── supabase/                               # Supabase client configuration
@@ -101,7 +138,13 @@ VenU/
 ├── supabase/                               # DATABASE DIRECTORY
 │   ├── migrations/                              # Database schema migrations
 │   │   ├── 0000_init.sql                         # Initial schema (users, venues, services, bookings, reviews)
-│   │   └── 0001_add_category.sql                 # Adds category column to venues
+│   │   ├── 0001_add_category.sql                 # Adds category column to venues
+│   │   ├── 0002_add_status_and_availability.sql  # Adds venue/user status and availability table
+│   │   ├── 0003_add_missing_policies.sql         # Additional RLS policies
+│   │   ├── 0003_add_user_insert_policy.sql       # User insert policy
+│   │   ├── 0004_add_table_grants.sql             # Table grants for RLS
+│   │   ├── 0005_add_provider_contact_fields.sql  # Provider contact info fields
+│   │   └── 0006_add_admin_message.sql            # Admin message fields for venue approval
 │   └── seed.sql                                # Seed data for development
 │
 ├── docs/                                   # DOCUMENTATION DIRECTORY
@@ -142,6 +185,10 @@ supabase (PostgreSQL)
     │   ├── description (TEXT)                         # Venue description
     │   ├── campus (TEXT, NOT NULL)                    # Campus location (multi-tenant key)
     │   ├── category (TEXT)                            # Venue category (Beauty, Food, Tech, etc.)
+    │   ├── status (TEXT)                              # 'pending' | 'approved' | 'rejected'
+    │   ├── admin_message (TEXT)                       # Admin approval/rejection message
+    │   ├── status_updated_at (TIMESTAMP)              # When status was last changed
+    │   ├── status_updated_by (UUID, FK)               # Admin who changed the status
     │   ├── image_url (TEXT)                           # Venue image URL
     │   ├── created_at (TIMESTAMP)                     # Venue creation timestamp
     │   └── updated_at (TIMESTAMP)                     # Last update timestamp
@@ -223,7 +270,8 @@ User (venue_owner)
 
 #### Venues Table
 - **SELECT**: Public (everyone can view venues)
-- **INSERT/UPDATE/DELETE**: Only venue owners can manage their own venues
+- **INSERT/DELETE**: Only venue owners can manage their own venues
+- **UPDATE**: Venue owners can update their own venues; Admins can update any venue (for status changes)
 
 #### Services Table
 - **SELECT**: Public (everyone can view services)
@@ -248,6 +296,10 @@ User (venue_owner)
 ### Database Indexes
 
 - `idx_venues_category`: Index on `venues.category` for faster filtering by category
+- `idx_venues_status`: Index on `venues.status` for admin approval queue
+- `idx_venues_status_updated_at`: Index on `venues.status_updated_at` for audit purposes
+- `idx_users_status`: Index on `users.status` for admin user management
+- `idx_availability_venue_id`: Index on `availability.venue_id` for faster lookups
 
 ### Database Triggers & Functions
 

@@ -10,7 +10,7 @@
 
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -27,7 +27,8 @@ export default function NewVenuePage() {
   const [hourlyRate, setHourlyRate] = useState("")
   const [capacity, setCapacity] = useState("")
   const [processing, setProcessing] = useState(false)
-  const supabase = createClient()
+  // Memoize Supabase client to prevent recreation on every render
+  const supabase = useMemo(() => createClient(), [])
   const { user } = useAuth()
   const router = useRouter()
 
@@ -64,7 +65,7 @@ export default function NewVenuePage() {
       if (error) throw error
 
       alert("Venue created successfully!")
-      router.push("/dashboard")
+      router.push("/provider")
     } catch (error) {
       console.error("Error creating venue:", error)
       alert("Failed to create venue. Please try again.")
@@ -78,7 +79,7 @@ export default function NewVenuePage() {
       {/* Navigation */}
       <nav className="bg-white border-b">
         <div className="container mx-auto px-4 py-4">
-          <Link href="/dashboard">
+          <Link href="/">
             <h1 className="text-2xl font-bold text-blue-600">VenU</h1>
           </Link>
         </div>
@@ -150,7 +151,7 @@ export default function NewVenuePage() {
                   <Button type="submit" disabled={processing}>
                     {processing ? "Creating..." : "Create Venue"}
                   </Button>
-                  <Link href="/dashboard">
+                  <Link href="/">
                     <Button type="button" variant="outline">
                       Cancel
                     </Button>

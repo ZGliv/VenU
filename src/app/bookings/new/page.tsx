@@ -11,7 +11,7 @@
 
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Venue } from "@/lib/types"
@@ -33,7 +33,8 @@ export default function NewBookingPage() {
   const [endTime, setEndTime] = useState("")
   const [date, setDate] = useState("")
   const [processing, setProcessing] = useState(false)
-  const supabase = createClient()
+  // Memoize Supabase client to prevent recreation on every render
+  const supabase = useMemo(() => createClient(), [])
   const { user } = useAuth()
 
   useEffect(() => {

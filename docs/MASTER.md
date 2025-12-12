@@ -25,26 +25,28 @@ VenU connects students with local service providers directly. Instead of scrolli
 
 ## 3. Roadmap
 
-### Phase 1: Foundation (Current)
-*   [ ] Project Initialization (Clean Slate).
-*   [ ] Database Schema (Multi-tenant, Service-oriented).
-*   [ ] Authentication (Supabase Auth).
+### Phase 1: Foundation (Complete)
+*   [x] Project Initialization (Clean Slate).
+*   [x] Database Schema (Multi-tenant, Service-oriented).
+*   [x] Authentication (Supabase Auth with Google OAuth).
 
-### Phase 2: The Service Model
-*   [ ] Seed Data Generation (Realistic "State University" dataset).
-*   [ ] Explore Page (Campus selector, Category filters).
-*   [ ] Venue/Provider Profile Pages.
+### Phase 2: The Service Model (Complete)
+*   [x] Seed Data Generation (Realistic dataset for 3 campuses).
+*   [x] Explore Page (Campus selector, Category filters).
+*   [x] Venue/Provider Profile Pages.
 
-### Phase 3: Booking Flow
-*   [ ] Service Selection UI.
-*   [ ] Booking Logic (Time slots, Conflicts).
-*   [ ] User Dashboard (My Bookings).
-*   [ ] Provider Dashboard (My Schedule).
+### Phase 3: Booking Flow (Complete)
+*   [x] Service Selection UI.
+*   [x] Booking Logic (Time slots based on availability, Conflict detection).
+*   [x] User Dashboard (My Bookings, Settings).
+*   [x] Provider Dashboard (Venues, Services, Availability, Bookings).
 
-### Phase 4: Polish & Launch
-*   [ ] Mobile Responsiveness.
-*   [ ] Google OAuth Integration.
-*   [ ] Deployment on Vercel.
+### Phase 4: Admin & Polish (Complete)
+*   [x] Admin Dashboard (Metrics, User management, Venue approval).
+*   [x] Role-based access control.
+*   [x] Light mode aesthetic with modern design.
+*   [x] Mobile Responsiveness.
+*   [x] Ready for Vercel deployment.
 
 ## 4. Future Concepts
 *   **Social:** See friends' bookings.
