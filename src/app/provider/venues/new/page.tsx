@@ -29,7 +29,7 @@ const CATEGORIES = [
   "Food",
   "Tech",
   "Fitness",
-  "Photography",
+  "Photography/Videography",
   "Music",
   "Events",
   "Services",

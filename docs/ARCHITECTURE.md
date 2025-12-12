@@ -36,6 +36,20 @@ VenU is built using **Next.js 14+ with the App Router**, which uses React Server
 5. Server components use `src/lib/supabase/server.ts` to access user data
 6. Client components use `src/lib/supabase/client.ts` for browser-side operations
 
+### Protected Admin Emails
+
+To ensure certain users always have admin access (even after database resets), set the `NEXT_PUBLIC_ADMIN_EMAILS` environment variable in your `.env.local` file:
+
+```bash
+NEXT_PUBLIC_ADMIN_EMAILS=you@gmail.com,buddy@gmail.com
+```
+
+When these users sign in:
+- If their account exists but has a non-admin role, it will be automatically upgraded to admin
+- If their account is new, it will be created with the admin role
+
+This is handled by `src/components/providers/auth-provider.tsx`.
+
 ### Styling System
 
 - **Tailwind CSS**: Utility-first CSS framework

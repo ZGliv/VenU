@@ -7,9 +7,10 @@
  * Features:
  * - Hero image with venue details
  * - Services list with pricing
- * - Provider information card
+ * - Provider information card with bio popup
  * - Quick info sidebar
  * - Book buttons for services
+ * - Favorite and share functionality
  * - Dynamic back navigation (admin venues vs explore based on ?from=admin param)
  */
 
@@ -23,10 +24,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Clock, MapPin, Star, ArrowLeft, Share2, Heart, MessageCircle, Mail, Phone, ShieldCheck } from "lucide-react";
+import { Clock, MapPin, Star, ArrowLeft, Share2, Heart, MessageCircle, Mail, Phone, ShieldCheck, User } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { VenueActions } from "./venue-actions";
 
 // Service type for TypeScript
 interface Service {
@@ -41,6 +43,7 @@ interface Service {
 interface VenueOwner {
   name: string | null;
   avatar_url: string | null;
+  bio: string | null;
 }
 
 // Venue type including relations
@@ -72,7 +75,7 @@ export default async function VenuePage({
   const isFromAdmin = searchParams.from === "admin";
   const supabase = createClient();
   
-  // Fetch venue details with services and owner info
+  // Fetch venue details with services and owner info (including bio for provider profile)
   // Use explicit relationship name because venues has two FKs to users (owner_id and status_updated_by)
   const { data: venue, error } = await supabase
     .from("venues")
@@ -81,7 +84,8 @@ export default async function VenuePage({
       services (*),
       users!venues_owner_id_fkey (
         name,
-        avatar_url
+        avatar_url,
+        bio
       )
     `)
     .eq("id", params.id)
@@ -149,15 +153,8 @@ export default async function VenuePage({
               {typedVenue.category}
         </div>
 
-            {/* Action buttons */}
-            <div className="absolute top-4 right-4 flex items-center gap-2">
-              <Button size="icon" variant="secondary" className="h-10 w-10 rounded-full bg-white/90 backdrop-blur-sm hover:bg-white">
-                <Heart className="h-5 w-5" />
-              </Button>
-              <Button size="icon" variant="secondary" className="h-10 w-10 rounded-full bg-white/90 backdrop-blur-sm hover:bg-white">
-                <Share2 className="h-5 w-5" />
-              </Button>
-            </div>
+            {/* Action buttons - favorite and share with functionality */}
+            <VenueActions venueId={typedVenue.id} venueName={typedVenue.name} />
             
             {/* Venue title overlay */}
             <div className="absolute bottom-0 left-0 right-0 p-6">
@@ -210,7 +207,7 @@ export default async function VenuePage({
               )}
 
               {/* Services */}
-                                    <div>
+                                    <div id="services">
                 <h2 className="text-lg font-semibold text-foreground mb-4">Services</h2>
                 <div className="bg-white rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
                   {typedVenue.services?.length > 0 ? (
@@ -261,93 +258,129 @@ export default async function VenuePage({
             {/* Right Column: Sidebar */}
             <div className="w-full lg:w-80 flex-shrink-0">
               <div className="lg:sticky lg:top-24 space-y-4">
-                {/* Provider Card */}
-                <div className="bg-white rounded-xl p-5 border border-gray-200">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
-                    Provider
-                  </h3>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="h-12 w-12 rounded-full bg-gray-100 overflow-hidden relative flex-shrink-0">
-                      {typedVenue.users?.avatar_url ? (
-                                         <Image 
-                          src={typedVenue.users.avatar_url} 
-                          alt={typedVenue.users.name || "Provider"} 
-                                            fill 
-                                            className="object-cover" 
-                                         />
-                                     ) : (
-                                         <div className="h-full w-full flex items-center justify-center bg-primary text-primary-foreground font-bold text-lg">
-                          {typedVenue.users?.name?.[0]?.toUpperCase() || "P"}
-                                         </div>
-                                     )}
-                                </div>
-                                <div>
-                      <div className="font-medium text-foreground">{typedVenue.users?.name || "Provider"}</div>
-                      <div className="text-sm text-muted-foreground">Joined 2024</div>
-                                </div>
-                            </div>
-                  <div className="flex gap-2">
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" className="flex-1 border-gray-200">
+                {/* Provider Card - black background with gradient accent */}
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-xl p-5 cursor-pointer group transition-all hover:shadow-lg hover:shadow-violet-500/10">
+                      {/* Decorative gradient orbs */}
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl" />
+                      <div className="absolute bottom-0 left-0 w-24 h-24 bg-violet-500/10 rounded-full blur-2xl" />
+                      
+                      <div className="relative z-10">
+                        <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-4">
+                          Provider
+                        </h3>
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="h-12 w-12 rounded-full bg-slate-700 overflow-hidden relative flex-shrink-0 ring-2 ring-slate-600">
+                            {typedVenue.users?.avatar_url ? (
+                              <Image 
+                                src={typedVenue.users.avatar_url} 
+                                alt={typedVenue.users.name || "Provider"} 
+                                fill 
+                                className="object-cover" 
+                              />
+                            ) : (
+                              <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-violet-500 text-white font-bold text-lg">
+                                {typedVenue.users?.name?.[0]?.toUpperCase() || "P"}
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-medium text-white">{typedVenue.users?.name || "Provider"}</div>
+                            <div className="text-sm text-slate-400">Joined 2024</div>
+                          </div>
+                        </div>
+                        
+                        {/* Contact Button */}
+                        <Button className="w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white border-0 group-hover:shadow-lg group-hover:shadow-violet-500/25 transition-all">
                           <MessageCircle className="h-4 w-4 mr-2" />
                           Contact
                         </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Contact Provider</DialogTitle>
-                          <DialogDescription>
-                            Get in touch with {typedVenue.provider_name || typedVenue.users?.name || "the provider"}
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
+                      </div>
+                    </div>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-3">
+                        <div className="h-12 w-12 rounded-full bg-gray-100 overflow-hidden relative flex-shrink-0">
+                          {typedVenue.users?.avatar_url ? (
+                            <Image 
+                              src={typedVenue.users.avatar_url} 
+                              alt={typedVenue.users.name || "Provider"} 
+                              fill 
+                              className="object-cover" 
+                            />
+                          ) : (
+                            <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-violet-500 text-white font-bold text-lg">
+                              {typedVenue.users?.name?.[0]?.toUpperCase() || "P"}
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <div>{typedVenue.users?.name || "Provider"}</div>
+                          <div className="text-sm font-normal text-muted-foreground">
+                            {typedVenue.name}
+                          </div>
+                        </div>
+                      </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      {/* Bio Section */}
+                      {typedVenue.users?.bio ? (
+                        <div>
+                          <h4 className="text-sm font-semibold text-foreground mb-2">About</h4>
+                          <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                            {typedVenue.users.bio}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic">
+                          This provider hasn&apos;t added a bio yet.
+                        </p>
+                      )}
+                      
+                      {/* Contact Section */}
+                      <div className="pt-4 border-t">
+                        <h4 className="text-sm font-semibold text-foreground mb-3">Contact Information</h4>
+                        <div className="space-y-3">
                           {typedVenue.provider_name && (
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground mb-1">Name</p>
-                              <p className="text-foreground">{typedVenue.provider_name}</p>
+                            <div className="flex items-center gap-2 text-sm">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-foreground">{typedVenue.provider_name}</span>
                             </div>
                           )}
                           {typedVenue.provider_email && (
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground mb-1">Email</p>
-                              <div className="flex items-center gap-2">
-                                <p className="text-foreground">{typedVenue.provider_email}</p>
-                                <a
-                                  href={`mailto:${typedVenue.provider_email}`}
-                                  className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-                                >
-                                  <Mail className="h-4 w-4" />
-                                  Send Email
-                                </a>
-                              </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <Mail className="h-4 w-4 text-muted-foreground" />
+                              <a
+                                href={`mailto:${typedVenue.provider_email}`}
+                                className="text-primary hover:underline"
+                              >
+                                {typedVenue.provider_email}
+                              </a>
                             </div>
                           )}
                           {typedVenue.provider_phone && (
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground mb-1">Phone</p>
-                              <div className="flex items-center gap-2">
-                                <p className="text-foreground">{typedVenue.provider_phone}</p>
-                                <a
-                                  href={`tel:${typedVenue.provider_phone.replace(/[^\d+]/g, '')}`}
-                                  className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-                                >
-                                  <Phone className="h-4 w-4" />
-                                  Call
-                                </a>
-                              </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <Phone className="h-4 w-4 text-muted-foreground" />
+                              <a
+                                href={`tel:${typedVenue.provider_phone.replace(/[^\d+]/g, '')}`}
+                                className="text-primary hover:underline"
+                              >
+                                {typedVenue.provider_phone}
+                              </a>
                             </div>
                           )}
-                          {!typedVenue.provider_email && !typedVenue.provider_phone && (
-                            <p className="text-sm text-muted-foreground">
-                              Contact information not available for this provider.
+                          {!typedVenue.provider_email && !typedVenue.provider_phone && !typedVenue.provider_name && (
+                            <p className="text-sm text-muted-foreground italic">
+                              Contact information not available.
                             </p>
                           )}
                         </div>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                        </div>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
 
                         {/* Quick Info */}
                 <div className="bg-white rounded-xl p-5 border border-gray-200">
@@ -370,22 +403,27 @@ export default async function VenuePage({
                   </div>
                 </div>
 
-                {/* CTA */}
-                <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-xl p-5 text-white">
+                {/* Ready to book? */}
+                <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-xl p-5">
                   {/* Decorative gradient orbs */}
-                  <div className="absolute top-0 left-0 w-32 h-32 bg-blue-500/20 rounded-full blur-2xl" />
-                  <div className="absolute bottom-0 right-0 w-32 h-32 bg-amber-500/20 rounded-full blur-2xl" />
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl" />
+                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-violet-500/10 rounded-full blur-2xl" />
                   
                   <div className="relative z-10">
-                    <h3 className="font-semibold mb-2">Ready to book?</h3>
-                    <p className="text-sm text-slate-300 mb-4">
+                    <h3 className="text-sm font-semibold text-white mb-2">
+                      Ready to book?
+                    </h3>
+                    <p className="text-sm text-slate-400 mb-4">
                       Select a service above to check availability and book your appointment.
                     </p>
-                    <Button className="w-full bg-gradient-to-r from-blue-500 to-violet-500 hover:from-blue-600 hover:to-violet-600 text-white border-0">
-                      View All Services
-                    </Button>
+                    <Link href="#services">
+                      <Button className="w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white border-0 shadow-lg shadow-violet-500/25 transition-all">
+                        View All Services
+                      </Button>
+                    </Link>
                   </div>
-                        </div>
+                </div>
+
                     </div>
                 </div>
             </div>

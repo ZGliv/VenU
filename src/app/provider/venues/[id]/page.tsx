@@ -24,7 +24,7 @@ import { ArrowLeft, Loader2, Trash2, Store } from "lucide-react";
 
 // Available categories
 const CATEGORIES = [
-  "Beauty", "Academic", "Food", "Tech", "Fitness", "Photography",
+  "Beauty", "Academic", "Food", "Tech", "Fitness", "Photography/Videography",
   "Music", "Events", "Services", "Professional", "Sports", "Gaming",
   "Design", "Creative",
 ];

@@ -5,9 +5,15 @@
  * Manages user authentication state across the application using Supabase Auth.
  * Provides user data and loading state to all child components.
  * 
+ * Features:
+ * - Auto-assigns admin role to protected admin emails (NEXT_PUBLIC_ADMIN_EMAILS)
+ * - Syncs user profile with database
+ * - Handles auth state changes
+ * 
  * Exports:
  * - AuthProvider: Context provider component that wraps the app
  * - useAuth: Hook to access auth state (user, loading, signOut)
+ * - isProtectedAdmin: Helper to check if an email is a protected admin
  */
 
 "use client";
@@ -15,6 +21,27 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
+
+/**
+ * Protected admin emails from environment variable.
+ * These users will always be assigned the "admin" role when they sign up or log in.
+ * Set NEXT_PUBLIC_ADMIN_EMAILS in your .env.local file (comma-separated list).
+ * Example: NEXT_PUBLIC_ADMIN_EMAILS=you@gmail.com,buddy@gmail.com
+ */
+const ADMIN_EMAILS: string[] = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
+  .split(",")
+  .map((email) => email.trim().toLowerCase())
+  .filter((email) => email.length > 0);
+
+/**
+ * Checks if an email is in the protected admin list.
+ * @param email - Email address to check
+ * @returns True if the email is a protected admin
+ */
+export function isProtectedAdmin(email: string | undefined | null): boolean {
+  if (!email) return false;
+  return ADMIN_EMAILS.includes(email.toLowerCase());
+}
 
 /**
  * Shape of the user profile data from the public.users table.
@@ -64,6 +91,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /**
    * Fetches or creates a user profile from the database.
    * If no profile exists and auth user info is provided, creates a new profile.
+   * Protected admin emails (from NEXT_PUBLIC_ADMIN_EMAILS) are auto-assigned admin role.
+   * Also ensures existing protected admins have their role corrected if it was reset.
    */
   const fetchOrCreateProfile = useCallback(async (userId: string, authUser?: User): Promise<UserProfile | null> => {
     try {
@@ -74,19 +103,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq("id", userId)
         .single();
 
-      // If profile exists, return it
+      // If profile exists, check if it needs admin role correction
       if (data) {
-        return data as UserProfile;
+        const profile = data as UserProfile;
+        
+        // If this email is a protected admin but role is not admin, fix it
+        if (isProtectedAdmin(profile.email) && profile.role !== "admin") {
+          console.log("Correcting role for protected admin:", profile.email);
+          const { error: updateError } = await supabase
+            .from("users")
+            .update({ role: "admin" })
+            .eq("id", userId);
+          
+          if (updateError) {
+            console.error("Error correcting admin role:", updateError);
+          } else {
+            // Return the corrected profile
+            return { ...profile, role: "admin" };
+          }
+        }
+        
+        return profile;
       }
 
       // If no profile found (PGRST116 = no rows) and we have auth user info, create one
       if (error?.code === "PGRST116" && authUser) {
+        // Determine role: admin for protected emails, student for everyone else
+        const userEmail = authUser.email || "";
+        const userRole = isProtectedAdmin(userEmail) ? "admin" : "student";
+        
+        if (userRole === "admin") {
+          console.log("Creating profile with admin role for protected email:", userEmail);
+        }
+        
         const newProfile = {
           id: userId,
-          email: authUser.email || "",
+          email: userEmail,
           name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || null,
           avatar_url: authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null,
-          role: "student" as const,
+          role: userRole as "student" | "venue_owner" | "admin",
           status: "active" as const,
         };
         

@@ -143,16 +143,16 @@ export default function LandingPage() {
       gradient: "from-emerald-500/20 to-teal-500/20",
     },
     { 
-      name: "Photography", 
+      name: "Photography/Videography", 
       description: "Portraits & events",
-      category: "Photography", 
+      category: "Photography/Videography", 
       img: "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?auto=format&fit=crop&q=80&w=600",
       gradient: "from-violet-500/20 to-purple-500/20",
     },
   ];
 
   // Quick search suggestions
-  const quickSearches = ["Haircuts", "Tutoring", "Coffee", "Repairs", "Photography"];
+  const quickSearches = ["Haircuts", "Tutoring", "Coffee", "Repairs", "Photography/Videography"];
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FAFAFA]">
