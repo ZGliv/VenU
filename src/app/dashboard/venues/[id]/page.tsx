@@ -175,14 +175,6 @@ export default async function VenuePage({
 
         {/* Content */}
         <div className="max-w-6xl mx-auto px-4 md:px-6 pb-16">
-          {/* About Section - Full Width Above */}
-          <div className="mb-8">
-            <h2 className="text-lg font-semibold text-foreground mb-3">About</h2>
-            <p className="text-muted-foreground leading-relaxed">
-              {typedVenue.description}
-            </p>
-          </div>
-
           {/* Admin Message - only visible when coming from admin venue management */}
           {isFromAdmin && typedVenue.admin_message && (
             <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-xl">
@@ -257,7 +249,17 @@ export default async function VenuePage({
 
             {/* Right Column: Sidebar */}
             <div className="w-full lg:w-80 flex-shrink-0">
-              <div className="lg:sticky lg:top-24">
+              <div className="lg:sticky lg:top-24 space-y-4">
+                {/* About Provider Section */}
+                {typedVenue.users?.bio && (
+                  <div className="bg-white rounded-xl p-5 border border-gray-200">
+                    <h2 className="text-lg font-semibold text-foreground mb-3">About</h2>
+                    <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                      {typedVenue.users.bio}
+                    </p>
+                  </div>
+                )}
+
                 {/* Combined Provider & Quick Info Card */}
                 <Dialog>
                   <DialogTrigger asChild>
