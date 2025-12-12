@@ -332,13 +332,6 @@ export function DevPanel() {
                     );
                   })}
                 </div>
-
-                {/* Info note for production view mode */}
-                {isProduction && isAdmin && (
-                  <p className="mt-4 text-xs text-muted-foreground text-center border-t border-gray-100 pt-3">
-                    Your role stays Admin. Click to view other dashboards.
-                  </p>
-                )}
               </>
             )}
           </div>
