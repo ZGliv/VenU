@@ -24,7 +24,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Clock, MapPin, Star, ArrowLeft, Share2, Heart, MessageCircle, Mail, Phone, ShieldCheck, User } from "lucide-react";
+import { Clock, MapPin, Star, ArrowLeft, Share2, Heart, Mail, Phone, ShieldCheck, User } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -238,7 +238,7 @@ export default async function VenuePage({
                                 <Link href={`/book/${typedVenue.id}/${service.id}`}>
                                   <Button 
                                     size="sm" 
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700"
+                                    className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700"
                                   >
                                             Book
                                         </Button>
@@ -257,45 +257,72 @@ export default async function VenuePage({
 
             {/* Right Column: Sidebar */}
             <div className="w-full lg:w-80 flex-shrink-0">
-              <div className="lg:sticky lg:top-24 space-y-4">
-                {/* Provider Card - black background with gradient accent */}
+              <div className="lg:sticky lg:top-24">
+                {/* Combined Provider & Quick Info Card */}
                 <Dialog>
                   <DialogTrigger asChild>
-                    <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-xl p-5 cursor-pointer group transition-all hover:shadow-lg hover:shadow-violet-500/10">
+                    <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-xl p-5 cursor-pointer group transition-all hover:shadow-lg hover:shadow-violet-500/10 hover:scale-[1.02]">
                       {/* Decorative gradient orbs */}
                       <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl" />
                       <div className="absolute bottom-0 left-0 w-24 h-24 bg-violet-500/10 rounded-full blur-2xl" />
                       
-                      <div className="relative z-10">
-                        <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-4">
-                          Provider
-                        </h3>
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="h-12 w-12 rounded-full bg-slate-700 overflow-hidden relative flex-shrink-0 ring-2 ring-slate-600">
-                            {typedVenue.users?.avatar_url ? (
-                              <Image 
-                                src={typedVenue.users.avatar_url} 
-                                alt={typedVenue.users.name || "Provider"} 
-                                fill 
-                                className="object-cover" 
-                              />
-                            ) : (
-                              <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-violet-500 text-white font-bold text-lg">
-                                {typedVenue.users?.name?.[0]?.toUpperCase() || "P"}
-                              </div>
-                            )}
+                      <div className="relative z-10 space-y-5">
+                        {/* Provider Section */}
+                        <div>
+                          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-4">
+                            Provider
+                          </h3>
+                          <div className="flex items-center gap-3 mb-4">
+                            <div className="h-12 w-12 rounded-full bg-slate-700 overflow-hidden relative flex-shrink-0 ring-2 ring-slate-600">
+                              {typedVenue.users?.avatar_url ? (
+                                <Image 
+                                  src={typedVenue.users.avatar_url} 
+                                  alt={typedVenue.users.name || "Provider"} 
+                                  fill 
+                                  className="object-cover" 
+                                />
+                              ) : (
+                                <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-violet-500 text-white font-bold text-lg">
+                                  {typedVenue.users?.name?.[0]?.toUpperCase() || "P"}
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <div className="font-medium text-white">{typedVenue.users?.name || "Provider"}</div>
+                              <div className="text-sm text-slate-400">Joined 2024</div>
+                            </div>
                           </div>
-                          <div>
-                            <div className="font-medium text-white">{typedVenue.users?.name || "Provider"}</div>
-                            <div className="text-sm text-slate-400">Joined 2024</div>
+                          
+                          {/* View Bio Button */}
+                          <Button className="w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white border-0 group-hover:shadow-lg group-hover:shadow-violet-500/25 transition-all">
+                            <User className="h-4 w-4 mr-2" />
+                            View Bio
+                          </Button>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="border-t border-slate-700"></div>
+
+                        {/* Quick Info Section */}
+                        <div>
+                          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-4">
+                            Quick Info
+                          </h3>
+                          <div className="space-y-3 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-slate-400">Hours</span>
+                              <span className="font-medium text-white">09:00 - 18:00</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-400">Location</span>
+                              <span className="font-medium text-white">{typedVenue.campus}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-400">Services</span>
+                              <span className="font-medium text-white">{typedVenue.services?.length || 0} available</span>
+                            </div>
                           </div>
                         </div>
-                        
-                        {/* Contact Button */}
-                        <Button className="w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white border-0 group-hover:shadow-lg group-hover:shadow-violet-500/25 transition-all">
-                          <MessageCircle className="h-4 w-4 mr-2" />
-                          Contact
-                        </Button>
                       </div>
                     </div>
                   </DialogTrigger>
@@ -381,51 +408,8 @@ export default async function VenuePage({
                     </div>
                   </DialogContent>
                 </Dialog>
-
-                        {/* Quick Info */}
-                <div className="bg-white rounded-xl p-5 border border-gray-200">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
-                    Quick Info
-                  </h3>
-                  <div className="space-y-3 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Hours</span>
-                      <span className="font-medium text-foreground">09:00 - 18:00</span>
-                    </div>
-                            <div className="flex justify-between">
-                      <span className="text-muted-foreground">Location</span>
-                      <span className="font-medium text-foreground">{typedVenue.campus}</span>
-                            </div>
-                             <div className="flex justify-between">
-                      <span className="text-muted-foreground">Services</span>
-                      <span className="font-medium text-foreground">{typedVenue.services?.length || 0} available</span>
-                            </div>
-                  </div>
-                </div>
-
-                {/* Ready to book? */}
-                <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-xl p-5">
-                  {/* Decorative gradient orbs */}
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl" />
-                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-violet-500/10 rounded-full blur-2xl" />
-                  
-                  <div className="relative z-10">
-                    <h3 className="text-sm font-semibold text-white mb-2">
-                      Ready to book?
-                    </h3>
-                    <p className="text-sm text-slate-400 mb-4">
-                      Select a service above to check availability and book your appointment.
-                    </p>
-                    <Link href="#services">
-                      <Button className="w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white border-0 shadow-lg shadow-violet-500/25 transition-all">
-                        View All Services
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-
-                    </div>
-                </div>
+              </div>
+            </div>
             </div>
         </div>
       </main>
