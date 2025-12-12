@@ -175,39 +175,91 @@ export default async function VenuePage({
 
         {/* Content */}
         <div className="max-w-6xl mx-auto px-4 md:px-6 pb-16">
-          <div className="flex flex-col lg:flex-row gap-8">
-            {/* Left Column: About & Provider */}
-            <div className="flex-1">
-              {/* Description */}
-              <div className="mb-8">
-                <h2 className="text-lg font-semibold text-foreground mb-3">About</h2>
-                <p className="text-muted-foreground leading-relaxed">
-                  {typedVenue.description}
-                </p>
-              </div>
+          {/* About Section - Full Width Above */}
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold text-foreground mb-3">About</h2>
+            <p className="text-muted-foreground leading-relaxed">
+              {typedVenue.description}
+            </p>
+          </div>
 
-              {/* Admin Message - only visible when coming from admin venue management */}
-              {isFromAdmin && typedVenue.admin_message && (
-                <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <ShieldCheck className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-sm font-semibold text-blue-900 mb-1">Admin Message</h3>
-                      <p className="text-sm text-blue-800 whitespace-pre-wrap">{typedVenue.admin_message}</p>
-                      {typedVenue.status_updated_at && (
-                        <p className="text-xs text-blue-600 mt-2">
-                          Updated: {new Date(typedVenue.status_updated_at).toLocaleString()}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+          {/* Admin Message - only visible when coming from admin venue management */}
+          {isFromAdmin && typedVenue.admin_message && (
+            <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <ShieldCheck className="h-5 w-5 text-blue-600" />
                 </div>
-              )}
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-blue-900 mb-1">Admin Message</h3>
+                  <p className="text-sm text-blue-800 whitespace-pre-wrap">{typedVenue.admin_message}</p>
+                  {typedVenue.status_updated_at && (
+                    <p className="text-xs text-blue-600 mt-2">
+                      Updated: {new Date(typedVenue.status_updated_at).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
-              {/* Combined Provider & Quick Info Card */}
-              <Dialog>
+          <div className="flex flex-col lg:flex-row gap-8">
+            {/* Left Column: Services */}
+            <div className="flex-1">
+              {/* Services */}
+                                    <div id="services">
+                <h2 className="text-lg font-semibold text-foreground mb-4">Services</h2>
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+                  {typedVenue.services?.length > 0 ? (
+                    typedVenue.services.map((service) => (
+                      <div 
+                        key={service.id} 
+                        className="p-4 md:p-5 flex items-center justify-between hover:bg-gray-50 transition-colors group"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-foreground mb-1">{service.name}</h3>
+                          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                                            <span className="flex items-center gap-1">
+                              <Clock className="h-3.5 w-3.5" /> 
+                              {service.duration} mins
+                                            </span>
+                            {service.description && (
+                              <>
+                                <span className="text-gray-300">|</span>
+                                <span className="truncate">{service.description}</span>
+                              </>
+                            )}
+                                        </div>
+                                    </div>
+                        <div className="flex items-center gap-4 ml-4">
+                          <div className="text-lg font-semibold text-foreground">
+                                            ${service.price}
+                                        </div>
+                                <Link href={`/book/${typedVenue.id}/${service.id}`}>
+                                  <Button 
+                                    size="sm" 
+                                    className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700"
+                                  >
+                                            Book
+                                        </Button>
+                                </Link>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-8 text-center text-muted-foreground">
+                      No services available yet.
+                    </div>
+                  )}
+                </div>
+                    </div>
+                </div>
+
+            {/* Right Column: Sidebar */}
+            <div className="w-full lg:w-80 flex-shrink-0">
+              <div className="lg:sticky lg:top-24">
+                {/* Combined Provider & Quick Info Card */}
+                <Dialog>
                   <DialogTrigger asChild>
                     <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-xl p-5 cursor-pointer group transition-all hover:shadow-lg hover:shadow-violet-500/10 hover:scale-[1.02]">
                       {/* Decorative gradient orbs */}
@@ -356,60 +408,9 @@ export default async function VenuePage({
                     </div>
                   </DialogContent>
                 </Dialog>
-            </div>
-
-            {/* Right Column: Services */}
-            <div className="w-full lg:w-96 flex-shrink-0">
-              <div className="lg:sticky lg:top-24">
-                <div id="services">
-                  <h2 className="text-lg font-semibold text-foreground mb-4">Services</h2>
-                  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
-                    {typedVenue.services?.length > 0 ? (
-                      typedVenue.services.map((service) => (
-                        <div 
-                          key={service.id} 
-                          className="p-4 md:p-5 flex items-center justify-between hover:bg-gray-50 transition-colors group"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-medium text-foreground mb-1">{service.name}</h3>
-                            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3.5 w-3.5" /> 
-                                {service.duration} mins
-                              </span>
-                              {service.description && (
-                                <>
-                                  <span className="text-gray-300">|</span>
-                                  <span className="truncate">{service.description}</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-4 ml-4">
-                            <div className="text-lg font-semibold text-foreground">
-                              ${service.price}
-                            </div>
-                            <Link href={`/book/${typedVenue.id}/${service.id}`}>
-                              <Button 
-                                size="sm" 
-                                className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700"
-                              >
-                                Book
-                              </Button>
-                            </Link>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="p-8 text-center text-muted-foreground">
-                        No services available yet.
-                      </div>
-                    )}
-                  </div>
-                </div>
               </div>
             </div>
-          </div>
+            </div>
         </div>
       </main>
     </div>
