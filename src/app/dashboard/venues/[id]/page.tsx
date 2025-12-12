@@ -244,8 +244,7 @@ export default async function VenuePage({
                     </div>
                   )}
                 </div>
-                    </div>
-                </div>
+              </div>
             </div>
 
             {/* Right Column: Sidebar */}
