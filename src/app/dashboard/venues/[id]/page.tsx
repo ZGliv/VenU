@@ -16,19 +16,12 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Clock, MapPin, Star, ArrowLeft, Share2, Heart, Mail, Phone, ShieldCheck, User } from "lucide-react";
+import { Clock, MapPin, Star, ArrowLeft, Share2, Heart, ShieldCheck } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { VenueActions } from "./venue-actions";
+import { ProviderCard } from "./provider-card";
 
 // Service type for TypeScript
 interface Service {
@@ -175,29 +168,29 @@ export default async function VenuePage({
 
         {/* Content */}
         <div className="max-w-6xl mx-auto px-4 md:px-6 pb-16">
-          {/* Admin Message - only visible when coming from admin venue management */}
-          {isFromAdmin && typedVenue.admin_message && (
-            <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-              <div className="flex items-start gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <ShieldCheck className="h-5 w-5 text-blue-600" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-blue-900 mb-1">Admin Message</h3>
-                  <p className="text-sm text-blue-800 whitespace-pre-wrap">{typedVenue.admin_message}</p>
-                  {typedVenue.status_updated_at && (
-                    <p className="text-xs text-blue-600 mt-2">
-                      Updated: {new Date(typedVenue.status_updated_at).toLocaleString()}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="flex flex-col lg:flex-row gap-8 items-start">
-            {/* Left Column: Services */}
+          <div className="flex flex-col lg:flex-row gap-8">
+            {/* Left Column: Info & Services */}
             <div className="flex-1">
+              {/* Admin Message - only visible when coming from admin venue management */}
+              {isFromAdmin && typedVenue.admin_message && (
+                <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <ShieldCheck className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-sm font-semibold text-blue-900 mb-1">Admin Message</h3>
+                      <p className="text-sm text-blue-800 whitespace-pre-wrap">{typedVenue.admin_message}</p>
+                      {typedVenue.status_updated_at && (
+                        <p className="text-xs text-blue-600 mt-2">
+                          Updated: {new Date(typedVenue.status_updated_at).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Services */}
                                     <div id="services">
                 <h2 className="text-lg font-semibold text-foreground mb-4">Services</h2>
@@ -244,164 +237,54 @@ export default async function VenuePage({
                     </div>
                   )}
                 </div>
-              </div>
-            </div>
+                    </div>
+                </div>
 
             {/* Right Column: Sidebar */}
-            <div className="w-full lg:w-80 flex-shrink-0 lg:pt-11">
-              <div className="lg:sticky lg:top-24">
-                {/* Combined Provider & Quick Info Card */}
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-xl p-5 cursor-pointer group transition-all hover:shadow-lg hover:shadow-violet-500/10 hover:scale-[1.02]">
-                      {/* Decorative gradient orbs */}
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl" />
-                      <div className="absolute bottom-0 left-0 w-24 h-24 bg-violet-500/10 rounded-full blur-2xl" />
-                      
-                      <div className="relative z-10 space-y-5">
-                        {/* Provider Section */}
-                        <div>
-                          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-4">
-                            Provider
-                          </h3>
-                          <div className="flex items-center gap-3 mb-4">
-                            <div className="h-12 w-12 rounded-full bg-slate-700 overflow-hidden relative flex-shrink-0 ring-2 ring-slate-600">
-                              {typedVenue.users?.avatar_url ? (
-                                <Image 
-                                  src={typedVenue.users.avatar_url} 
-                                  alt={typedVenue.users.name || "Provider"} 
-                                  fill 
-                                  className="object-cover" 
-                                />
-                              ) : (
-                                <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-violet-500 text-white font-bold text-lg">
-                                  {typedVenue.users?.name?.[0]?.toUpperCase() || "P"}
-                                </div>
-                              )}
-                            </div>
-                            <div>
-                              <div className="font-medium text-white">{typedVenue.users?.name || "Provider"}</div>
-                              <div className="text-sm text-slate-400">Joined 2024</div>
-                            </div>
-                          </div>
-                          
-                          {/* View Bio Button */}
-                          <Button className="w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white border-0 group-hover:shadow-lg group-hover:shadow-violet-500/25 transition-all">
-                            <User className="h-4 w-4 mr-2" />
-                            View Bio
-                          </Button>
-                        </div>
+            <div className="w-full lg:w-80 flex-shrink-0">
+              <div className="lg:sticky lg:top-24 space-y-4">
+                {/* Provider Card */}
+                <ProviderCard
+                  providerName={typedVenue.users?.name || null}
+                  providerAvatar={typedVenue.users?.avatar_url || null}
+                  providerBio={typedVenue.users?.bio || null}
+                  venueName={typedVenue.name}
+                  providerContactName={typedVenue.provider_name || null}
+                  providerEmail={typedVenue.provider_email || null}
+                  providerPhone={typedVenue.provider_phone || null}
+                />
 
-                        {/* Divider */}
-                        <div className="border-t border-slate-700"></div>
+                {/* About */}
+                <div className="bg-white rounded-xl p-5 border border-gray-200">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">About</h2>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {typedVenue.description}
+                  </p>
+                </div>
 
-                        {/* Quick Info Section */}
-                        <div>
-                          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-4">
-                            Quick Info
-                          </h3>
-                          <div className="space-y-3 text-sm">
-                            <div className="flex justify-between">
-                              <span className="text-slate-400">Hours</span>
-                              <span className="font-medium text-white">09:00 - 18:00</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-400">Location</span>
-                              <span className="font-medium text-white">{typedVenue.campus}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-400">Services</span>
-                              <span className="font-medium text-white">{typedVenue.services?.length || 0} available</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                        {/* Quick Info */}
+                <div className="bg-white rounded-xl p-5 border border-gray-200">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+                    Quick Info
+                  </h3>
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Hours</span>
+                      <span className="font-medium text-foreground">09:00 - 18:00</span>
                     </div>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
-                      <DialogTitle className="flex items-center gap-3">
-                        <div className="h-12 w-12 rounded-full bg-gray-100 overflow-hidden relative flex-shrink-0">
-                          {typedVenue.users?.avatar_url ? (
-                            <Image 
-                              src={typedVenue.users.avatar_url} 
-                              alt={typedVenue.users.name || "Provider"} 
-                              fill 
-                              className="object-cover" 
-                            />
-                          ) : (
-                            <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-violet-500 text-white font-bold text-lg">
-                              {typedVenue.users?.name?.[0]?.toUpperCase() || "P"}
+                            <div className="flex justify-between">
+                      <span className="text-muted-foreground">Location</span>
+                      <span className="font-medium text-foreground">{typedVenue.campus}</span>
                             </div>
-                          )}
-                        </div>
-                        <div>
-                          <div>{typedVenue.users?.name || "Provider"}</div>
-                          <div className="text-sm font-normal text-muted-foreground">
-                            {typedVenue.name}
-                          </div>
-                        </div>
-                      </DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      {/* Bio Section */}
-                      {typedVenue.users?.bio ? (
-                        <div>
-                          <h4 className="text-sm font-semibold text-foreground mb-2">About</h4>
-                          <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                            {typedVenue.users.bio}
-                          </p>
-                        </div>
-                      ) : (
-                        <p className="text-sm text-muted-foreground italic">
-                          This provider hasn&apos;t added a bio yet.
-                        </p>
-                      )}
-                      
-                      {/* Contact Section */}
-                      <div className="pt-4 border-t">
-                        <h4 className="text-sm font-semibold text-foreground mb-3">Contact Information</h4>
-                        <div className="space-y-3">
-                          {typedVenue.provider_name && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <User className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-foreground">{typedVenue.provider_name}</span>
+                             <div className="flex justify-between">
+                      <span className="text-muted-foreground">Services</span>
+                      <span className="font-medium text-foreground">{typedVenue.services?.length || 0} available</span>
                             </div>
-                          )}
-                          {typedVenue.provider_email && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <Mail className="h-4 w-4 text-muted-foreground" />
-                              <a
-                                href={`mailto:${typedVenue.provider_email}`}
-                                className="text-primary hover:underline"
-                              >
-                                {typedVenue.provider_email}
-                              </a>
-                            </div>
-                          )}
-                          {typedVenue.provider_phone && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <Phone className="h-4 w-4 text-muted-foreground" />
-                              <a
-                                href={`tel:${typedVenue.provider_phone.replace(/[^\d+]/g, '')}`}
-                                className="text-primary hover:underline"
-                              >
-                                {typedVenue.provider_phone}
-                              </a>
-                            </div>
-                          )}
-                          {!typedVenue.provider_email && !typedVenue.provider_phone && !typedVenue.provider_name && (
-                            <p className="text-sm text-muted-foreground italic">
-                              Contact information not available.
-                            </p>
-                          )}
-                        </div>
-                      </div>
+                  </div>
+                </div>
+
                     </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </div>
+                </div>
             </div>
         </div>
       </main>

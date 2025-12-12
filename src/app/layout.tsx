@@ -7,7 +7,7 @@
  * Provides:
  * - Inter font family
  * - AuthProvider for authentication state
- * - DevPanel for development role switching (dev mode only)
+ * - Toaster for toast notifications
  * - Global CSS styles
  */
 
@@ -15,7 +15,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/providers/auth-provider";
-import { DevPanel } from "@/components/dev-panel";
+import { Toaster } from "sonner";
 
 // Configure Inter font with Latin subset
 const inter = Inter({ subsets: ["latin"] });
@@ -42,7 +42,17 @@ export default function RootLayout({
       <body className={inter.className}>
         <AuthProvider>
           {children}
-          <DevPanel />
+          <Toaster 
+            position="bottom-right" 
+            maxVisibleToasts={1}
+            toastOptions={{
+              className: "bg-white border border-gray-200 shadow-lg",
+              style: {
+                background: "white",
+                color: "inherit",
+              },
+            }}
+          />
         </AuthProvider>
       </body>
     </html>

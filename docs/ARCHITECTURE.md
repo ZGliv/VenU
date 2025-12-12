@@ -101,7 +101,8 @@ VenU/
 │   │   │
 │   │   ├── explore/                                # Venue exploration/discovery
 │   │   │   ├── explore-content.tsx                     # Explore page content component
-│   │   │   └── page.tsx                                # Main explore/discover page
+│   │   │   ├── page.tsx                                # Main explore/discover page
+│   │   │   └── venue-card.tsx                          # Venue card with favorite button
 │   │   │
 │   │   ├── provider/                               # Provider dashboard area
 │   │   │   ├── layout.tsx                              # Provider layout
@@ -234,12 +235,19 @@ supabase (PostgreSQL)
     │   │
     │   └── [has one] review                           # Review for this booking (optional)
     │
-    └── reviews                                      # User reviews/ratings
-        ├── id (UUID, PK)                              # Unique review identifier
-        ├── booking_id (UUID, FK, UNIQUE)              # References bookings.id (one review per booking)
-        ├── rating (INTEGER, NOT NULL)                 # Rating 1-5 stars
-        ├── comment (TEXT)                             # Review text/comment
-        └── created_at (TIMESTAMP)                     # Review creation timestamp
+    ├── reviews                                      # User reviews/ratings
+    │   ├── id (UUID, PK)                              # Unique review identifier
+    │   ├── booking_id (UUID, FK, UNIQUE)              # References bookings.id (one review per booking)
+    │   ├── rating (INTEGER, NOT NULL)                 # Rating 1-5 stars
+    │   ├── comment (TEXT)                             # Review text/comment
+    │   └── created_at (TIMESTAMP)                     # Review creation timestamp
+    │
+    └── favorites                                    # User-favorited venues
+        ├── id (UUID, PK)                              # Unique favorite identifier
+        ├── user_id (UUID, FK)                         # References users.id
+        ├── venue_id (UUID, FK)                        # References venues.id
+        ├── created_at (TIMESTAMP)                     # When favorited
+        └── UNIQUE(user_id, venue_id)                  # User can only favorite a venue once
 ```
 
 ### Database Relationships
@@ -265,6 +273,11 @@ supabase (PostgreSQL)
 5. **bookings → reviews** (One-to-One)
    - One booking can have exactly one review (optional)
    - Review deletion cascades if booking is deleted
+
+6. **users → favorites ← venues** (Many-to-Many)
+   - Users can favorite multiple venues
+   - Venues can be favorited by multiple users
+   - Junction table with unique constraint on (user_id, venue_id)
 
 #### Data Flow Example
 
@@ -299,6 +312,11 @@ User (venue_owner)
 - **SELECT**: Public (everyone can view reviews)
 - **INSERT**: Users can create reviews for their completed bookings only
 
+#### Favorites Table
+- **SELECT**: Users can view their own favorites
+- **INSERT**: Users can add their own favorites
+- **DELETE**: Users can remove their own favorites
+
 ### Database Constraints
 
 - **Multi-tenancy**: Data is filtered by `campus` column (not enforced at DB level, handled in application)
@@ -314,6 +332,8 @@ User (venue_owner)
 - `idx_venues_status_updated_at`: Index on `venues.status_updated_at` for audit purposes
 - `idx_users_status`: Index on `users.status` for admin user management
 - `idx_availability_venue_id`: Index on `availability.venue_id` for faster lookups
+- `idx_favorites_user_id`: Index on `favorites.user_id` for faster user lookups
+- `idx_favorites_venue_id`: Index on `favorites.venue_id` for faster venue lookups
 
 ### Database Triggers & Functions
 

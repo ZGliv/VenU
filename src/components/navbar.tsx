@@ -4,7 +4,11 @@
  * Main navigation component for VenU.
  * Premium, minimal design with subtle glass effect.
  * Displays the site logo, navigation links, and user authentication state.
- * Shows different links based on user role (student, venue_owner, admin).
+ * 
+ * Navigation Logic:
+ * - All users see "Provider Dashboard" link (to encourage becoming a provider)
+ * - Admin users additionally see "Admin Dashboard" link
+ * - All users see "Settings" link
  * 
  * Exports:
  * - Navbar: Main navigation bar component
@@ -15,7 +19,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/providers/auth-provider";
-import { User, LogOut, LayoutDashboard, Store, Shield, ChevronDown } from "lucide-react";
+import { User, LogOut, Store, Shield, ChevronDown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,35 +35,6 @@ import {
  */
 export function Navbar() {
   const { user, profile, loading, signOut } = useAuth();
-
-  /**
-   * Determines the dashboard link based on user role.
-   * Admin users go to admin dashboard, providers to provider dashboard.
-   * Students go to their bookings page.
-   */
-  const getDashboardLink = () => {
-    if (profile?.role === "admin") return "/admin";
-    if (profile?.role === "venue_owner") return "/provider";
-    return "/dashboard/bookings";
-  };
-
-  /**
-   * Gets the appropriate dashboard icon based on user role.
-   */
-  const getDashboardIcon = () => {
-    if (profile?.role === "admin") return <Shield className="h-4 w-4 mr-2" />;
-    if (profile?.role === "venue_owner") return <Store className="h-4 w-4 mr-2" />;
-    return <LayoutDashboard className="h-4 w-4 mr-2" />;
-  };
-
-  /**
-   * Gets the dashboard label based on user role.
-   */
-  const getDashboardLabel = () => {
-    if (profile?.role === "admin") return "Admin Dashboard";
-    if (profile?.role === "venue_owner") return "Provider Dashboard";
-    return "My Bookings";
-  };
 
   /**
    * Gets the role display text with proper formatting.
@@ -138,14 +113,27 @@ export function Navbar() {
                   </div>
                 </div>
                 
-                {/* Dashboard link */}
+                {/* Admin Dashboard - only visible to admins */}
+                {profile?.role === "admin" && (
+                  <DropdownMenuItem asChild>
+                    <Link 
+                      href="/admin" 
+                      className="flex items-center cursor-pointer rounded-lg px-3 py-2 hover:bg-slate-50"
+                    >
+                      <Shield className="h-4 w-4 mr-2" />
+                      Admin Dashboard
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+
+                {/* Provider Dashboard - visible to everyone to encourage becoming a provider */}
                 <DropdownMenuItem asChild>
                   <Link 
-                    href={getDashboardLink()} 
+                    href="/provider" 
                     className="flex items-center cursor-pointer rounded-lg px-3 py-2 hover:bg-slate-50"
                   >
-                    {getDashboardIcon()}
-                    {getDashboardLabel()}
+                    <Store className="h-4 w-4 mr-2" />
+                    Provider Dashboard
                   </Link>
                 </DropdownMenuItem>
                 

@@ -369,3 +369,41 @@
 .delay-300 { animation-delay: 300ms; }
 .delay-400 { animation-delay: 400ms; }
 .delay-500 { animation-delay: 500ms; }
+
+/* Sonner toast custom styling - white background with colored text/icons */
+[data-sonner-toast] {
+  background: white !important;
+  border: 1px solid hsl(var(--border)) !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  color: inherit !important;
+}
+
+/* Success toasts - green text and icon */
+[data-sonner-toast][data-type="success"] {
+  background: white !important;
+}
+
+[data-sonner-toast][data-type="success"] [data-icon],
+[data-sonner-toast][data-type="success"] svg {
+  color: #10b981 !important;
+}
+
+[data-sonner-toast][data-type="success"] [data-title],
+[data-sonner-toast][data-type="success"] [data-description] {
+  color: #10b981 !important;
+}
+
+/* Error toasts - red text and icon */
+[data-sonner-toast][data-type="error"] {
+  background: white !important;
+}
+
+[data-sonner-toast][data-type="error"] [data-icon],
+[data-sonner-toast][data-type="error"] svg {
+  color: #ef4444 !important;
+}
+
+[data-sonner-toast][data-type="error"] [data-title],
+[data-sonner-toast][data-type="error"] [data-description] {
+  color: #ef4444 !important;
+}

@@ -14,9 +14,10 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Heart, Share2, Check, Link2 } from "lucide-react";
+import { Heart, Share2, Check } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { toast } from "sonner";
 
 // Props for the venue actions component
 interface VenueActionsProps {
@@ -65,12 +66,15 @@ export function VenueActions({ venueId, venueName }: VenueActionsProps) {
   // Handle favorite toggle
   const handleFavorite = useCallback(async () => {
     if (!userId) {
-      // Could redirect to sign in or show a message
-      alert("Please sign in to save favorites");
+      // Show toast message for unauthenticated users
+      toast.error("Please sign in to save favorites", { id: "favorite-auth" });
       return;
     }
 
     setIsLoading(true);
+
+    // Use consistent toastId to replace previous toasts instead of stacking
+    const toastId = `favorite-${venueId}`;
 
     if (isFavorited) {
       // Remove from favorites
@@ -82,6 +86,9 @@ export function VenueActions({ venueId, venueName }: VenueActionsProps) {
 
       if (!error) {
         setIsFavorited(false);
+        toast.error("Removed from favorites", { id: toastId });
+      } else {
+        toast.error("Failed to remove from favorites", { id: toastId });
       }
     } else {
       // Add to favorites
@@ -91,6 +98,9 @@ export function VenueActions({ venueId, venueName }: VenueActionsProps) {
 
       if (!error) {
         setIsFavorited(true);
+        toast.success("Added to favorites", { id: toastId });
+      } else {
+        toast.error("Failed to add to favorites", { id: toastId });
       }
     }
 
