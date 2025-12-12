@@ -257,7 +257,7 @@ export default function NewVenuePage() {
                 className="bg-white"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Enter a URL for your venue's cover image. Use Unsplash or other image hosting services.
+                Enter a URL for your venue&apos;s cover image. Use Unsplash or other image hosting services.
               </p>
             </div>
           </div>
@@ -330,7 +330,7 @@ export default function NewVenuePage() {
                 <p className="font-medium text-amber-800 mb-1">Review Process</p>
                 <p className="text-amber-700">
                   New venues are submitted for review before they appear publicly. 
-                  You'll be notified once your venue is approved.
+                  You&apos;ll be notified once your venue is approved.
                 </p>
               </div>
             </div>

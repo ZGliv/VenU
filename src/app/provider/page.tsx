@@ -92,7 +92,7 @@ export default function ProviderDashboard() {
       const { data: venues } = await supabase
         .from("venues")
         .select("id")
-        .eq("owner_id", user.id);
+        .eq("owner_id", user?.id);
 
       const venueIds = venues?.map(v => v.id) || [];
       
@@ -170,7 +170,7 @@ export default function ProviderDashboard() {
           Welcome back, {profile?.name?.split(" ")[0] || "Provider"}
         </h1>
         <p className="text-muted-foreground">
-          Here's what's happening with your venues today.
+          Here&apos;s what&apos;s happening with your venues today.
         </p>
       </div>
 

@@ -79,7 +79,7 @@ export default function UserBookingsPage() {
             )
           )
         `)
-        .eq("user_id", user.id)
+        .eq("user_id", user?.id)
         .order("start_time", { ascending: false });
 
       if (!error) {

@@ -80,11 +80,6 @@ export function DevPanel() {
   const [switching, setSwitching] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Don't render in production
-  if (process.env.NODE_ENV === "production") {
-    return null;
-  }
-
   // Get current role configuration
   const currentRole = roles.find((r) => r.value === profile?.role) || roles[0];
 
@@ -104,6 +99,11 @@ export function DevPanel() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isOpen]);
+
+  // Don't render in production - placed after hooks to follow rules of hooks
+  if (process.env.NODE_ENV === "production") {
+    return null;
+  }
 
   /**
    * Switches the current user's role in the database.

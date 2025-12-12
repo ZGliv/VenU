@@ -66,7 +66,7 @@ export default function EditVenuePage() {
         .from("venues")
         .select("*")
         .eq("id", venueId)
-        .eq("owner_id", user.id)
+        .eq("owner_id", user?.id)
         .single();
 
       if (error || !data) {
@@ -128,7 +128,7 @@ export default function EditVenuePage() {
         provider_phone: formData.provider_phone.trim() || null,
       })
       .eq("id", venueId)
-      .eq("owner_id", user.id);
+      .eq("owner_id", user?.id);
 
     if (updateError) {
       setError(updateError.message);
@@ -153,7 +153,7 @@ export default function EditVenuePage() {
       .from("venues")
       .delete()
       .eq("id", venueId)
-      .eq("owner_id", user.id);
+      .eq("owner_id", user?.id);
 
     if (deleteError) {
       setError(deleteError.message);

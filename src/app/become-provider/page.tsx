@@ -73,7 +73,7 @@ export default function BecomeProviderPage() {
         <Navbar />
         <div className="max-w-2xl mx-auto px-4 py-16 text-center">
           <CheckCircle className="h-16 w-16 text-emerald-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-foreground mb-2">You're Already a Provider!</h1>
+          <h1 className="text-2xl font-bold text-foreground mb-2">You&apos;re Already a Provider!</h1>
           <p className="text-muted-foreground mb-6">
             You can access your provider dashboard to manage venues and bookings.
           </p>
@@ -92,7 +92,7 @@ export default function BecomeProviderPage() {
         <Navbar />
         <div className="max-w-2xl mx-auto px-4 py-16 text-center">
           <CheckCircle className="h-16 w-16 text-violet-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-foreground mb-2">You're an Admin!</h1>
+          <h1 className="text-2xl font-bold text-foreground mb-2">You&apos;re an Admin!</h1>
           <p className="text-muted-foreground mb-6">
             As an admin, you have access to both the admin dashboard and can create venues.
           </p>

@@ -81,7 +81,7 @@ export default function AvailabilityPage() {
       const { data } = await supabase
         .from("venues")
         .select("id, name")
-        .eq("owner_id", user.id);
+        .eq("owner_id", user?.id);
 
       if (data && data.length > 0) {
         setVenues(data);

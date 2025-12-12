@@ -114,7 +114,7 @@ export default function VenueServicesPage() {
         .from("venues")
         .select("name")
         .eq("id", venueId)
-        .eq("owner_id", user.id)
+        .eq("owner_id", user?.id)
         .single();
 
       if (!venue) return;

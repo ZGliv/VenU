@@ -88,7 +88,7 @@ export default function ProviderBookingsPage() {
       const { data: venues } = await supabase
         .from("venues")
         .select("id")
-        .eq("owner_id", user.id);
+        .eq("owner_id", user?.id);
 
       if (!venues || venues.length === 0) {
         setBookings([]);

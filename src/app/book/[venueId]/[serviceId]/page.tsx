@@ -287,7 +287,7 @@ export default function BookingPage() {
           <AlertCircle className="h-16 w-16 text-gray-300 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-foreground mb-2">Service Not Found</h1>
           <p className="text-muted-foreground mb-6">
-            The service you're looking for doesn't exist or has been removed.
+            The service you&apos;re looking for doesn&apos;t exist or has been removed.
           </p>
           <Link href="/explore">
             <Button>Browse Services</Button>
@@ -547,7 +547,7 @@ export default function BookingPage() {
               </Button>
 
               <p className="text-xs text-muted-foreground text-center mt-3">
-                You won't be charged until the appointment is confirmed.
+                You won&apos;t be charged until the appointment is confirmed.
               </p>
             </div>
           </div>

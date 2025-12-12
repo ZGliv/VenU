@@ -11,7 +11,7 @@
 
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { Suspense, useEffect, useState, useMemo, useCallback } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Venue } from "@/lib/types"
@@ -19,11 +19,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { MapPin, DollarSign, Calendar, Clock } from "lucide-react"
+import { MapPin, DollarSign, Calendar } from "lucide-react"
 import { useAuth } from "@/components/providers/auth-provider"
 import Link from "next/link"
 
-export default function NewBookingPage() {
+// Inner component that uses useSearchParams
+function NewBookingContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const venueId = searchParams.get("venue_id")
@@ -37,26 +38,11 @@ export default function NewBookingPage() {
   const supabase = useMemo(() => createClient(), [])
   const { user } = useAuth()
 
-  useEffect(() => {
-    // Redirect if not authenticated
-    if (!user) {
-      router.push("/auth/signin")
-      return
-    }
-
-    // Load venue details if venue_id is provided
-    if (venueId) {
-      loadVenue()
-    } else {
-      router.push("/explore")
-    }
-  }, [venueId, user, router])
-
   /**
    * Loads venue details from the database.
    * Fetches venue information based on venue_id parameter.
    */
-  const loadVenue = async () => {
+  const loadVenue = useCallback(async () => {
     if (!venueId) return
 
     try {
@@ -75,7 +61,22 @@ export default function NewBookingPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [venueId, supabase, router])
+
+  useEffect(() => {
+    // Redirect if not authenticated
+    if (!user) {
+      router.push("/auth/signin")
+      return
+    }
+
+    // Load venue details if venue_id is provided
+    if (venueId) {
+      loadVenue()
+    } else {
+      router.push("/explore")
+    }
+  }, [venueId, user, router, loadVenue])
 
   /**
    * Calculates the total price based on start and end times.
@@ -91,7 +92,7 @@ export default function NewBookingPage() {
     const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60)
 
     if (hours <= 0) return 0
-    return Math.ceil(hours) * venue.hourly_rate
+    return Math.ceil(hours) * (venue.hourly_rate || 0)
   }
 
   /**
@@ -263,6 +264,19 @@ export default function NewBookingPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// Main export wrapped in Suspense for useSearchParams
+export default function NewBookingPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    }>
+      <NewBookingContent />
+    </Suspense>
   )
 }
 

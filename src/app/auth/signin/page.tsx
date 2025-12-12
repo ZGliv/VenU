@@ -15,7 +15,7 @@
 
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { Suspense, useEffect, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,8 @@ import { useAuth } from "@/components/providers/auth-provider";
 import Link from "next/link";
 import { ArrowLeft, Sparkles } from "lucide-react";
 
-export default function SignInPage() {
+// Inner component that uses useSearchParams
+function SignInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   // Memoize Supabase client to prevent recreation on every render
@@ -215,5 +216,21 @@ export default function SignInPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Main export wrapped in Suspense for useSearchParams
+export default function SignInPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-pulse flex items-center gap-2 text-muted-foreground">
+          <div className="h-5 w-5 rounded-full border-2 border-current border-t-transparent animate-spin" />
+          Loading...
+        </div>
+      </div>
+    }>
+      <SignInContent />
+    </Suspense>
   );
 }
