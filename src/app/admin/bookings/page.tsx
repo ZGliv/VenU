@@ -87,7 +87,7 @@ export default function AdminBookingsPage() {
               users!venues_owner_id_fkey (name, email)
             )
           ),
-          users (name, email)
+          users!bookings_user_id_fkey (name, email)
         `)
         .order("created_at", { ascending: false });
 

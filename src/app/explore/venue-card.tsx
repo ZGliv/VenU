@@ -153,12 +153,6 @@ export function VenueCard({ venue }: VenueCardProps) {
             className="object-cover group-hover:scale-105 transition-transform duration-500"
           />
           
-          {/* Rating badge - top right */}
-          <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-lg bg-white/90 backdrop-blur-sm text-sm font-medium shadow-sm">
-            <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-            4.9
-          </div>
-          
           {/* Category badge - top left */}
           <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-white/90 backdrop-blur-sm text-xs font-medium text-foreground/80 shadow-sm">
             {venue.category}

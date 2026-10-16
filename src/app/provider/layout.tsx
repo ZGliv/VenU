@@ -93,6 +93,7 @@ export default function ProviderLayout({
         <Button
           variant="ghost"
           size="icon"
+          aria-label={sidebarOpen ? "Close provider menu" : "Open provider menu"}
           onClick={() => setSidebarOpen(!sidebarOpen)}
         >
           {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}

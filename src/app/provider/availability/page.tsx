@@ -13,9 +13,11 @@
 
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { createClient } from "@/lib/supabase/client";
+import { bookingError } from "@/lib/booking";
 import { Button } from "@/components/ui/button";
 import { 
   Calendar, 
@@ -40,6 +42,7 @@ const DAYS = [
 interface Venue {
   id: string;
   name: string;
+  timezone: string | null;
 }
 
 // Availability type
@@ -61,6 +64,10 @@ export default function AvailabilityPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleFailed, setScheduleFailed] = useState(false);
+  const [timezone, setTimezone] = useState("");
 
   // Initialize availability for all days
   useEffect(() => {
@@ -68,7 +75,7 @@ export default function AvailabilityPage() {
       day_of_week: day.value,
       start_time: "09:00",
       end_time: "17:00",
-      enabled: day.value >= 1 && day.value <= 5, // Monday-Friday default
+      enabled: false,
     }));
     setAvailability(initialAvailability);
   }, []);
@@ -78,11 +85,12 @@ export default function AvailabilityPage() {
     if (!user) return;
 
     async function fetchVenues() {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("venues")
-        .select("id, name")
+        .select("id, name, timezone")
         .eq("owner_id", user?.id);
 
+      if (error) setError("We couldn’t load your providers. Please try again.");
       if (data && data.length > 0) {
         setVenues(data);
         setSelectedVenueId(data[0].id);
@@ -93,48 +101,23 @@ export default function AvailabilityPage() {
     fetchVenues();
   }, [user, supabase]);
 
-  // Fetch availability when venue changes
+  // A stale response must not replace the schedule after switching providers.
   useEffect(() => {
     if (!selectedVenueId) return;
-
-    async function fetchAvailability() {
-      const { data } = await supabase
-        .from("availability")
-        .select("*")
-        .eq("venue_id", selectedVenueId);
-
-      if (data && data.length > 0) {
-        // Map existing availability to state
-        setAvailability(DAYS.map(day => {
-          const existing = data.find(a => a.day_of_week === day.value);
-          if (existing) {
-            return {
-              day_of_week: day.value,
-              start_time: existing.start_time,
-              end_time: existing.end_time,
-              enabled: true,
-            };
-          }
-          return {
-            day_of_week: day.value,
-            start_time: "09:00",
-            end_time: "17:00",
-            enabled: false,
-          };
-        }));
-      } else {
-        // Reset to defaults if no availability set
-        setAvailability(DAYS.map(day => ({
-          day_of_week: day.value,
-          start_time: "09:00",
-          end_time: "17:00",
-          enabled: day.value >= 1 && day.value <= 5,
-        })));
-      }
-    }
-
-    fetchAvailability();
-  }, [selectedVenueId, supabase]);
+    let current = true;
+    setScheduleLoading(true); setScheduleFailed(false); setError(null);
+    setTimezone(venues.find(venue => venue.id === selectedVenueId)?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
+    supabase.from("availability").select("*").eq("venue_id", selectedVenueId).then(({ data, error }) => {
+      if (!current) return;
+      if (error) { setScheduleFailed(true); setError("We couldn’t load this schedule. Reload before saving changes."); }
+      else setAvailability(DAYS.map(day => {
+        const existing = data?.find(item => item.day_of_week === day.value);
+        return { day_of_week: day.value, start_time: existing?.start_time || "09:00", end_time: existing?.end_time || "17:00", enabled: Boolean(existing) };
+      }));
+      setScheduleLoading(false);
+    });
+    return () => { current = false; };
+  }, [selectedVenueId, supabase, venues]);
 
   /**
    * Toggles a day's availability on/off.
@@ -164,37 +147,23 @@ export default function AvailabilityPage() {
    * Saves availability to database.
    */
   const handleSave = async () => {
-    if (!selectedVenueId) return;
-
-    setSaving(true);
-
-    // Delete existing availability for this venue
-    await supabase
-      .from("availability")
-      .delete()
-      .eq("venue_id", selectedVenueId);
-
-    // Insert enabled days
-    const enabledDays = availability.filter(a => a.enabled);
-    
-    if (enabledDays.length > 0) {
-      const { error } = await supabase
-        .from("availability")
-        .insert(enabledDays.map(a => ({
-          venue_id: selectedVenueId,
-          day_of_week: a.day_of_week,
-          start_time: a.start_time,
-          end_time: a.end_time,
-        })));
-
-      if (error) {
-        console.error("Error saving availability:", error);
-      }
+    if (!selectedVenueId || scheduleLoading || scheduleFailed || saving) return;
+    const enabledDays = availability.filter(day => day.enabled);
+    if (!timezone || enabledDays.some(day => day.end_time <= day.start_time)) {
+      setError("Choose a timezone and make each end time later than its start time."); return;
     }
+    setSaving(true); setSaved(false); setError(null);
+    const { error } = await supabase.rpc("save_provider_schedule", {
+      venue: selectedVenueId, timezone_name: timezone,
+      days: enabledDays.map(({ day_of_week, start_time, end_time }) => ({ day_of_week, start_time, end_time })),
+    });
+    if (error) setError(bookingError(error, "Your schedule was not changed. Check the times and try again."));
+    else {
+      setSaved(true);
+      setVenues(current => current.map(venue => venue.id === selectedVenueId ? { ...venue, timezone } : venue));
 
+    }
     setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
   };
 
   if (loading) {
@@ -204,6 +173,8 @@ export default function AvailabilityPage() {
       </div>
     );
   }
+
+  if (error && venues.length === 0) return <div className="p-6"><p role="alert" className="text-red-700 mb-4">{error}</p><Button onClick={() => window.location.reload()}>Retry</Button></div>;
 
   if (venues.length === 0) {
     return (
@@ -215,7 +186,7 @@ export default function AvailabilityPage() {
             Create a venue first to set your availability.
           </p>
           <Button asChild>
-            <a href="/provider/venues/new">Create Your First Venue</a>
+            <Link href="/provider/venues/new">Create Your First Venue</Link>
           </Button>
         </div>
       </div>
@@ -233,14 +204,17 @@ export default function AvailabilityPage() {
       </div>
 
       <div className="max-w-2xl">
+        {error && <p role="alert" className="text-sm text-red-700 bg-red-50 p-4 rounded-xl mb-4">{error} {scheduleFailed && <button className="underline" onClick={() => window.location.reload()}>Reload schedule</button>}</p>}
+        {scheduleLoading && <p role="status" className="text-sm text-muted-foreground mb-4">Loading schedule…</p>}
         {/* Venue Selector */}
         <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
           <label className="text-sm font-medium text-foreground mb-2 block">
             Select Venue
           </label>
           <select
+            disabled={saving}
             value={selectedVenueId}
-            onChange={(e) => setSelectedVenueId(e.target.value)}
+            onChange={(e) => { setSelectedVenueId(e.target.value); setSaved(false); }}
             className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
           >
             {venues.map(venue => (
@@ -249,6 +223,12 @@ export default function AvailabilityPage() {
           </select>
         </div>
 
+        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+          <label htmlFor="provider-timezone" className="text-sm font-medium block mb-2">Provider timezone</label>
+          <input id="provider-timezone" list="timezone-options" value={timezone} disabled={saving || scheduleLoading || scheduleFailed} onChange={event => { setTimezone(event.target.value); setSaved(false); }} className="w-full border rounded-lg px-3 py-2" />
+          <datalist id="timezone-options">{["America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "Pacific/Honolulu", "Europe/London", "UTC"].map(zone => <option key={zone} value={zone} />)}</datalist>
+          <p className="text-xs text-muted-foreground mt-2">Confirm the timezone where you provide the service. Your weekly hours and customer appointment times use this zone.</p>
+        </div>
         {/* Weekly Schedule */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="p-4 border-b border-gray-100 flex items-center gap-2">
@@ -263,10 +243,11 @@ export default function AvailabilityPage() {
 
               return (
                 <div key={day.value} className="p-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       {/* Toggle */}
                       <button
+                        role="switch" aria-checked={dayAvail.enabled} aria-label={`${day.label} availability`} disabled={saving || scheduleLoading || scheduleFailed}
                         onClick={() => toggleDay(day.value)}
                         className={`w-10 h-6 rounded-full transition-colors relative ${
                           dayAvail.enabled ? "bg-emerald-500" : "bg-gray-200"
@@ -292,6 +273,7 @@ export default function AvailabilityPage() {
                           <Clock className="h-4 w-4 text-muted-foreground" />
                           <input
                             type="time"
+                            aria-label={`${day.label} start time`} disabled={saving || scheduleLoading || scheduleFailed}
                             value={dayAvail.start_time}
                             onChange={(e) => updateTime(day.value, "start_time", e.target.value)}
                             className="px-2 py-1 border border-gray-200 rounded-lg text-sm bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
@@ -300,6 +282,7 @@ export default function AvailabilityPage() {
                         <span className="text-muted-foreground">to</span>
                         <input
                           type="time"
+                          aria-label={`${day.label} end time`} disabled={saving || scheduleLoading || scheduleFailed}
                           value={dayAvail.end_time}
                           onChange={(e) => updateTime(day.value, "end_time", e.target.value)}
                           className="px-2 py-1 border border-gray-200 rounded-lg text-sm bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
@@ -319,7 +302,7 @@ export default function AvailabilityPage() {
 
         {/* Save Button */}
         <div className="mt-6 flex items-center gap-4">
-          <Button onClick={handleSave} disabled={saving}>
+          <Button onClick={handleSave} disabled={saving || scheduleLoading || scheduleFailed}>
             {saving ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             ) : saved ? (
@@ -328,7 +311,7 @@ export default function AvailabilityPage() {
             {saved ? "Saved!" : "Save Availability"}
           </Button>
           <p className="text-sm text-muted-foreground">
-            Changes apply to future bookings only.
+            Existing appointments keep their reserved times.
           </p>
         </div>
       </div>

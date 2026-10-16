@@ -16,6 +16,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { createClient } from "@/lib/supabase/client";
+import { bookingError } from "@/lib/booking";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -76,6 +77,8 @@ export default function ProviderBookingsPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
   const [updating, setUpdating] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
 
   // Fetch bookings
   useEffect(() => {
@@ -84,75 +87,30 @@ export default function ProviderBookingsPage() {
     async function fetchBookings() {
       setLoading(true);
 
-      // First get user's venues
-      const { data: venues } = await supabase
-        .from("venues")
-        .select("id")
-        .eq("owner_id", user?.id);
-
-      if (!venues || venues.length === 0) {
-        setBookings([]);
-        setLoading(false);
-        return;
-      }
-
-      const venueIds = venues.map(v => v.id);
-
-      // Get services for these venues
-      const { data: services } = await supabase
-        .from("services")
-        .select("id")
-        .in("venue_id", venueIds);
-
-      if (!services || services.length === 0) {
-        setBookings([]);
-        setLoading(false);
-        return;
-      }
-
-      const serviceIds = services.map(s => s.id);
-
-      // Get bookings for these services
-      const { data: bookingsData } = await supabase
-        .from("bookings")
-        .select(`
-          *,
-          services (
-            name,
-            duration,
-            venues (name)
-          ),
-          users (name, email)
-        `)
-        .in("service_id", serviceIds)
-        .order("start_time", { ascending: false });
-
-      setBookings(bookingsData || []);
+      setError(null);
+      const { data, error } = await supabase.from("bookings")
+        .select("*, services(name, duration, venues(name)), users!bookings_user_id_fkey(name, email)")
+        .eq("provider_id", user!.id).order("start_time", { ascending: false });
+      if (error) setError("We couldn’t load your bookings. Refresh to try again.");
+      else setBookings((data || []) as unknown as Booking[]);
       setLoading(false);
     }
 
     fetchBookings();
-  }, [user, supabase]);
+  }, [user, supabase, reload]);
 
   /**
    * Updates booking status.
    */
-  const updateBookingStatus = async (bookingId: string, newStatus: string) => {
-    setUpdating(bookingId);
-
-    const { error } = await supabase
-      .from("bookings")
-      .update({ status: newStatus })
-      .eq("id", bookingId);
-
-    if (!error) {
-      setBookings(prev => prev.map(b => 
-        b.id === bookingId 
-          ? { ...b, status: newStatus as Booking["status"] }
-          : b
-      ));
-    }
-
+  const updateBookingStatus = async (bookingId: string, newStatus: Booking["status"]) => {
+    const previous = bookings.find(booking => booking.id === bookingId);
+    if (!previous || updating) return;
+    setUpdating(bookingId); setError(null);
+    const { data, error } = await supabase.rpc("change_booking_status", {
+      booking: bookingId, expected_status: previous.status, new_status: newStatus,
+    });
+    if (error || !data) setError(bookingError(error));
+    else setBookings(current => current.map(booking => booking.id === bookingId ? { ...booking, status: data.status } : booking));
     setUpdating(null);
   };
 
@@ -213,7 +171,7 @@ export default function ProviderBookingsPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground mb-1">Bookings</h1>
           <p className="text-muted-foreground">
-            Manage customer appointments
+            Manage customer appointments. Times use your device’s timezone.
           </p>
         </div>
         
@@ -240,6 +198,7 @@ export default function ProviderBookingsPage() {
         </div>
       </div>
 
+      <div className="mb-5 flex flex-wrap items-center gap-3"><Button variant="outline" onClick={() => setReload(value => value + 1)} disabled={Boolean(updating)}>Refresh bookings</Button>{error && <p role="alert" className="text-sm text-red-700">{error}</p>}</div>
       {/* Bookings List */}
       {filteredBookings.length > 0 ? (
         <div className="space-y-4">
@@ -296,7 +255,7 @@ export default function ProviderBookingsPage() {
                         <Button
                           size="sm"
                           onClick={() => updateBookingStatus(booking.id, "confirmed")}
-                          disabled={updating === booking.id}
+                          disabled={Boolean(updating)}
                         >
                           {updating === booking.id ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -311,7 +270,7 @@ export default function ProviderBookingsPage() {
                           size="sm"
                           variant="outline"
                           onClick={() => updateBookingStatus(booking.id, "cancelled")}
-                          disabled={updating === booking.id}
+                          disabled={Boolean(updating)}
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
                         >
                           <XCircle className="h-4 w-4 mr-1" />
@@ -320,20 +279,24 @@ export default function ProviderBookingsPage() {
                       </>
                     )}
                     {booking.status === "confirmed" && (
+                      <>
                       <Button
                         size="sm"
                         onClick={() => updateBookingStatus(booking.id, "completed")}
-                        disabled={updating === booking.id}
+                        title={new Date(booking.end_time) > new Date() ? "Available after the appointment ends" : undefined}
+                        disabled={Boolean(updating) || new Date(booking.end_time) > new Date()}
                       >
                         {updating === booking.id ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
                           <>
                             <CheckCircle className="h-4 w-4 mr-1" />
-                            Mark Complete
+                            Complete
                           </>
                         )}
                       </Button>
+                      <Button size="sm" variant="outline" disabled={Boolean(updating)} onClick={() => updateBookingStatus(booking.id, "cancelled")}>Cancel</Button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -341,7 +304,7 @@ export default function ProviderBookingsPage() {
             );
           })}
         </div>
-      ) : (
+      ) : !error && (
         <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
           <ClipboardList className="h-16 w-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-foreground mb-2">

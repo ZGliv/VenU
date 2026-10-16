@@ -40,13 +40,6 @@ const CATEGORIES = [
   "Creative",
 ];
 
-// Available campuses
-const CAMPUSES = [
-  "State University",
-  "Ivy College",
-  "Tech Institute",
-];
-
 export default function NewVenuePage() {
   const router = useRouter();
   const { user } = useAuth();
@@ -60,7 +53,7 @@ export default function NewVenuePage() {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    campus: CAMPUSES[0],
+    campus: "",
     category: CATEGORIES[0],
     image_url: "",
     provider_name: "",
@@ -90,6 +83,7 @@ export default function NewVenuePage() {
 
     setLoading(true);
     setError(null);
+    if (!formData.campus.trim()) { setError("Campus is required."); setLoading(false); return; }
 
     // Validate required fields
     if (!formData.name.trim()) {
@@ -123,7 +117,7 @@ export default function NewVenuePage() {
         owner_id: user.id,
         name: formData.name.trim(),
         description: formData.description.trim(),
-        campus: formData.campus,
+        campus: formData.campus.trim(),
         category: formData.category,
         image_url: formData.image_url.trim() || null,
         provider_name: formData.provider_name.trim(),
@@ -211,17 +205,7 @@ export default function NewVenuePage() {
                 <label htmlFor="campus" className="block text-sm font-medium text-foreground mb-2">
                   Campus *
                 </label>
-                <select
-                  id="campus"
-                  name="campus"
-                  value={formData.campus}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
-                >
-                  {CAMPUSES.map(campus => (
-                    <option key={campus} value={campus}>{campus}</option>
-                  ))}
-                </select>
+                <input id="campus" name="campus" value={formData.campus} onChange={handleChange} required maxLength={100} placeholder="e.g. University of Pennsylvania" className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20" />
               </div>
               
               <div>

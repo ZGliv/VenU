@@ -1,559 +1,132 @@
-/**
- * book/[venueId]/[serviceId]/page.tsx
- * 
- * Booking page for selecting a time slot and confirming a booking.
- * Fetches provider availability and existing bookings to show available slots.
- * 
- * Features:
- * - Date picker for selecting booking date
- * - Available time slots based on provider schedule
- * - Booking confirmation
- * - Price summary
- */
-
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import { useAuth } from "@/components/providers/auth-provider";
 import { createClient } from "@/lib/supabase/client";
 import { Navbar } from "@/components/navbar";
 import { Button } from "@/components/ui/button";
-import { 
-  ArrowLeft, 
-  Calendar, 
-  Clock, 
-  MapPin, 
-  CheckCircle,
-  Loader2,
-  ChevronLeft,
-  ChevronRight,
-  AlertCircle
-} from "lucide-react";
+import { bookingError, dateInZone, shiftDay } from "@/lib/booking";
+import { ArrowLeft, Clock, MapPin, CheckCircle, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 
-// Service type
-interface Service {
-  id: string;
-  name: string;
-  description: string;
-  duration: number;
-  price: number;
-  venue_id: string;
-}
-
-// Venue type
-interface Venue {
-  id: string;
-  name: string;
-  campus: string;
-  image_url: string | null;
-}
-
-// Availability type
-interface Availability {
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
-}
-
-// Time slot type
-interface TimeSlot {
-  start: Date;
-  end: Date;
-  available: boolean;
-}
+interface Service { id: string; name: string; duration: number; price: number; venue_id: string }
+interface Venue { id: string; name: string; campus: string; timezone: string | null }
+interface Slot { start_time: string; end_time: string; available: boolean }
+interface Receipt { id: string; start_time: string; end_time: string; total_price: number; status: string }
 
 export default function BookingPage() {
-  const params = useParams();
-  const router = useRouter();
-  const { user, profile } = useAuth();
-  // Memoize Supabase client to prevent recreation on every render
+  const { venueId, serviceId } = useParams<{ venueId: string; serviceId: string }>();
+  const { user, profile, loading: authLoading, profileError, refreshProfile } = useAuth();
   const supabase = useMemo(() => createClient(), []);
-  
-  const venueId = params.venueId as string;
-  const serviceId = params.serviceId as string;
-  
   const [service, setService] = useState<Service | null>(null);
   const [venue, setVenue] = useState<Venue | null>(null);
-  const [availability, setAvailability] = useState<Availability[]>([]);
-  const [existingBookings, setExistingBookings] = useState<any[]>([]);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
-  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+  const [day, setDay] = useState("");
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [selected, setSelected] = useState<Slot | null>(null);
   const [loading, setLoading] = useState(true);
-  const [booking, setBooking] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [slotError, setSlotError] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
 
-  // Fetch service and venue data
   useEffect(() => {
-    async function fetchData() {
-      // Fetch service
-      const { data: serviceData } = await supabase
-        .from("services")
-        .select("*")
-        .eq("id", serviceId)
-        .single();
+    let current = true;
+    setLoading(true); setError(null);
+    Promise.all([
+      supabase.from("services").select("id,name,duration,price,venue_id").eq("id", serviceId).eq("venue_id", venueId).single(),
+      supabase.from("venues").select("id,name,campus,timezone").eq("id", venueId).eq("status", "approved").single(),
+    ]).then(([serviceResult, venueResult]) => {
+      if (!current) return;
+      if (serviceResult.error || venueResult.error) { setError("We couldn’t load this service. It may be unavailable, or the connection needs another try."); return; }
+      setService(serviceResult.data); setVenue(venueResult.data);
+      setDay(dateInZone(new Date(), venueResult.data.timezone || "UTC"));
+    }).catch(() => { if (current) setError("We couldn’t connect. Please try again."); })
+      .finally(() => { if (current) setLoading(false); });
+    return () => { current = false; };
+  }, [serviceId, venueId, supabase]);
 
-      if (serviceData) {
-        setService(serviceData);
-
-        // Fetch venue
-        const { data: venueData } = await supabase
-          .from("venues")
-          .select("*")
-          .eq("id", serviceData.venue_id)
-          .single();
-
-        if (venueData) {
-          setVenue(venueData);
-
-          // Fetch availability
-          const { data: availData } = await supabase
-            .from("availability")
-            .select("*")
-            .eq("venue_id", venueData.id);
-
-          setAvailability(availData || []);
-
-          // Fetch existing bookings
-          const { data: bookingsData } = await supabase
-            .from("bookings")
-            .select("*")
-            .eq("service_id", serviceId)
-            .in("status", ["pending", "confirmed"]);
-
-          setExistingBookings(bookingsData || []);
-        }
-      }
-
-      setLoading(false);
-    }
-
-    fetchData();
-  }, [serviceId, supabase]);
-
-  // Generate time slots when date changes
   useEffect(() => {
-    if (!service || !availability.length) {
-      setTimeSlots([]);
-      return;
-    }
-
-    const dayOfWeek = selectedDate.getDay();
-    const dayAvailability = availability.find(a => a.day_of_week === dayOfWeek);
-
-    if (!dayAvailability) {
-      setTimeSlots([]);
-      return;
-    }
-
-    // Generate slots
-    const slots: TimeSlot[] = [];
-    const [startHour, startMin] = dayAvailability.start_time.split(":").map(Number);
-    const [endHour, endMin] = dayAvailability.end_time.split(":").map(Number);
-
-    const startDate = new Date(selectedDate);
-    startDate.setHours(startHour, startMin, 0, 0);
-
-    const endDate = new Date(selectedDate);
-    endDate.setHours(endHour, endMin, 0, 0);
-
-    let currentSlot = new Date(startDate);
-
-    while (currentSlot.getTime() + service.duration * 60000 <= endDate.getTime()) {
-      const slotEnd = new Date(currentSlot.getTime() + service.duration * 60000);
-      
-      // Check if slot conflicts with existing bookings
-      const isBooked = existingBookings.some(booking => {
-        const bookingStart = new Date(booking.start_time);
-        const bookingEnd = new Date(booking.end_time);
-        return (
-          (currentSlot >= bookingStart && currentSlot < bookingEnd) ||
-          (slotEnd > bookingStart && slotEnd <= bookingEnd) ||
-          (currentSlot <= bookingStart && slotEnd >= bookingEnd)
-        );
-      });
-
-      // Check if slot is in the past
-      const isPast = currentSlot < new Date();
-
-      slots.push({
-        start: new Date(currentSlot),
-        end: slotEnd,
-        available: !isBooked && !isPast,
-      });
-
-      // Move to next slot (30 min intervals)
-      currentSlot = new Date(currentSlot.getTime() + 30 * 60000);
-    }
-
-    setTimeSlots(slots);
-    setSelectedSlot(null);
-  }, [selectedDate, service, availability, existingBookings]);
-
-  /**
-   * Navigate to previous day.
-   */
-  const prevDay = () => {
-    const newDate = new Date(selectedDate);
-    newDate.setDate(newDate.getDate() - 1);
-    if (newDate >= new Date(new Date().setHours(0, 0, 0, 0))) {
-      setSelectedDate(newDate);
-    }
-  };
-
-  /**
-   * Navigate to next day.
-   */
-  const nextDay = () => {
-    const newDate = new Date(selectedDate);
-    newDate.setDate(newDate.getDate() + 1);
-    // Limit to 30 days ahead
-    const maxDate = new Date();
-    maxDate.setDate(maxDate.getDate() + 30);
-    if (newDate <= maxDate) {
-      setSelectedDate(newDate);
-    }
-  };
-
-  /**
-   * Formats time for display.
-   */
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
+    if (!day || !user || !profile || receipt) return;
+    let current = true;
+    setSelected(null); setSlots([]); setSlotsLoading(true); setSlotError(null);
+    supabase.rpc("list_booking_slots", { service: serviceId, booking_day: day }).then(({ data, error: requestError }) => {
+      if (!current) return;
+      if (requestError) setSlotError(bookingError(requestError, "We couldn’t load appointment times. Please retry."));
+      else setSlots((data || []) as Slot[]);
+      setSlotsLoading(false);
     });
-  };
+    return () => { current = false; };
+  }, [day, serviceId, user, profile, receipt, reload, supabase]);
 
-  /**
-   * Handles booking confirmation.
-   * Validates user has a profile before attempting to create booking.
-   */
-  const handleBook = async () => {
-    if (!user || !profile || !selectedSlot || !service) {
-      setError("Please sign in to complete your booking.");
-      return;
-    }
-
-    setBooking(true);
-    setError(null);
-
-    const { error: insertError } = await supabase
-      .from("bookings")
-      .insert({
-        user_id: user.id,
-        service_id: service.id,
-        start_time: selectedSlot.start.toISOString(),
-        end_time: selectedSlot.end.toISOString(),
-        status: "pending",
-        total_price: service.price,
-      });
-
-    if (insertError) {
-      // Provide a user-friendly error message for common issues
-      if (insertError.message.includes("foreign key constraint")) {
-        setError("Your session has expired. Please sign out and sign back in.");
-      } else {
-        setError(insertError.message);
-      }
-      setBooking(false);
-      return;
-    }
-
-    setSuccess(true);
-    setBooking(false);
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        <div className="flex items-center justify-center min-h-[400px]">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      </div>
-    );
+  const zone = venue?.timezone || "UTC";
+  const today = dateInZone(new Date(), zone);
+  const time = (value: string) => new Date(value).toLocaleTimeString("en-US", { timeZone: zone, hour: "numeric", minute: "2-digit", timeZoneName: "short" });
+  const date = (value: string) => new Date(value).toLocaleDateString("en-US", { timeZone: zone, weekday: "long", month: "long", day: "numeric" });
+  async function requestBooking() {
+    if (!selected || !user || !service || saving) return;
+    setSaving(true); setError(null);
+    const { data, error: requestError } = await supabase.from("bookings").insert({
+      user_id: user.id, service_id: service.id, start_time: selected.start_time,
+      // PostgreSQL always replaces the submitted duration and price.
+      end_time: selected.end_time, total_price: service.price, status: "pending",
+    }).select("id,start_time,end_time,total_price,status").single();
+    if (requestError || !data) {
+      setError(bookingError(requestError));
+      setReload(value => value + 1);
+    } else setReceipt(data as Receipt);
+    setSaving(false);
   }
 
-  if (!service || !venue) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-          <AlertCircle className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-foreground mb-2">Service Not Found</h1>
-          <p className="text-muted-foreground mb-6">
-            The service you&apos;re looking for doesn&apos;t exist or has been removed.
-          </p>
-          <Link href="/explore">
-            <Button>Browse Services</Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  // Success state
-  if (success) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-          <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="h-10 w-10 text-emerald-600" />
-          </div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Booking Confirmed!</h1>
-          <p className="text-muted-foreground mb-8">
-            Your appointment has been submitted. The provider will confirm shortly.
-          </p>
-          
-          <div className="bg-white rounded-xl border border-gray-200 p-6 text-left mb-8">
-            <h2 className="font-semibold text-foreground mb-4">Booking Details</h2>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Service</span>
-                <span className="font-medium text-foreground">{service.name}</span>
+  return <div className="min-h-screen bg-[#FAFAFA]">
+    <Navbar />
+    <main className="max-w-4xl mx-auto px-4 py-8">
+      <Link href={`/dashboard/venues/${venueId}`} className="inline-flex items-center text-sm text-muted-foreground mb-6"><ArrowLeft className="h-4 w-4 mr-1" />Back to provider</Link>
+      {loading || authLoading ? <div className="py-20 flex justify-center" role="status"><Loader2 className="h-8 w-8 animate-spin" /><span className="sr-only">Loading booking</span></div>
+        : receipt && service && venue ? <section className="max-w-xl mx-auto bg-white border border-gray-200 rounded-2xl p-6 sm:p-8">
+          <CheckCircle className="h-10 w-10 text-emerald-600 mb-5" />
+          <p className="text-sm font-medium text-amber-700 mb-2">Pending provider response</p>
+          <h1 className="text-3xl font-bold mb-3">Request received</h1>
+          <p className="text-muted-foreground mb-6">Your time is reserved while the provider reviews it. Check My Bookings for confirmation or a decline.</p>
+          <dl className="space-y-4 text-sm">
+            <div><dt className="text-muted-foreground">Appointment</dt><dd className="font-medium">{service.name} at {venue.name}</dd></div>
+            <div><dt className="text-muted-foreground">When</dt><dd>{date(receipt.start_time)} · {time(receipt.start_time)}–{time(receipt.end_time)}</dd></div>
+            <div><dt className="text-muted-foreground">Service price</dt><dd>${Number(receipt.total_price).toFixed(2)} · Pay the provider directly</dd></div>
+            <div><dt className="text-muted-foreground">Reference</dt><dd className="break-all">{receipt.id}</dd></div>
+          </dl>
+          <Button asChild className="mt-8 w-full"><Link href="/dashboard/bookings">View My Bookings</Link></Button>
+        </section>
+        : !service || !venue ? <section className="max-w-xl mx-auto py-12"><h1 className="text-2xl font-bold mb-3">Service unavailable</h1><p role="alert" className="text-muted-foreground mb-6">{error}</p><Button onClick={() => window.location.reload()}>Try again</Button><Button variant="link" asChild><Link href="/explore">Browse services</Link></Button></section>
+        : !user || !profile ? <section className="max-w-xl mx-auto py-12"><h1 className="text-2xl font-bold mb-3">Sign in to request a time</h1><p className="text-muted-foreground mb-6">{profileError || "Your provider will see your name and email when you request an appointment."}</p>{user ? <Button onClick={refreshProfile}>Retry account</Button> : <Button asChild><Link href={`/auth/signin?next=${encodeURIComponent(`/book/${venueId}/${serviceId}`)}`}>Sign in</Link></Button>}</section>
+        : <div className="grid lg:grid-cols-3 gap-6">
+          <section className="lg:col-span-2 space-y-6">
+            <div><h1 className="text-3xl font-bold mb-2">Request an appointment</h1><p className="text-muted-foreground">Pick a time. Your provider will confirm the details.</p></div>
+            <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5">
+              <label htmlFor="booking-day" className="block text-sm font-semibold mb-3">Appointment date</label>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="icon" aria-label="Previous day" disabled={day <= today || saving} onClick={() => setDay(shiftDay(day, -1))}><ChevronLeft className="h-4 w-4" /></Button>
+                <input id="booking-day" type="date" min={today} max={shiftDay(today, 30)} value={day} disabled={saving} onChange={event => event.target.value && setDay(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 bg-white text-sm" />
+                <Button variant="outline" size="icon" aria-label="Next day" disabled={day >= shiftDay(today, 30) || saving} onClick={() => setDay(shiftDay(day, 1))}><ChevronRight className="h-4 w-4" /></Button>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Venue</span>
-                <span className="font-medium text-foreground">{venue.name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Date</span>
-                <span className="font-medium text-foreground">
-                  {selectedSlot?.start.toLocaleDateString("en-US", {
-                    weekday: "long",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Time</span>
-                <span className="font-medium text-foreground">
-                  {selectedSlot && formatTime(selectedSlot.start)}
-                </span>
-              </div>
-              <div className="flex justify-between pt-3 border-t border-gray-100">
-                <span className="text-muted-foreground">Total</span>
-                <span className="font-bold text-foreground">${service.price}</span>
-              </div>
+              <p className="text-xs text-muted-foreground mt-3 break-words">All times use the provider’s timezone: {venue.timezone || "not configured"}.</p>
             </div>
-          </div>
-          
-          <div className="flex gap-4 justify-center">
-            <Link href="/dashboard/bookings">
-              <Button>View My Bookings</Button>
-            </Link>
-            <Link href="/explore">
-              <Button variant="outline">Browse More</Button>
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Check if user is logged in and has a profile
-  if (!user || !profile) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Sign In Required</h1>
-          <p className="text-muted-foreground mb-6">
-            Please sign in to book this service.
-          </p>
-          <Link href="/auth/signin">
-            <Button>Sign In</Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-[#FAFAFA] relative overflow-hidden">
-      {/* Mesh gradient background */}
-      <div className="fixed inset-0 -z-10 mesh-gradient" />
-      
-      {/* Floating decorative blobs */}
-      <div className="fixed top-20 left-10 w-72 h-72 bg-blue-500/[0.07] rounded-full blur-3xl pointer-events-none" />
-      <div className="fixed bottom-20 right-10 w-80 h-80 bg-violet-500/[0.07] rounded-full blur-3xl pointer-events-none" />
-      
-      <Navbar />
-      
-      <div className="max-w-4xl mx-auto px-4 py-8 relative z-10">
-        {/* Back link */}
-        <Link 
-          href={`/dashboard/venues/${venueId}`}
-          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          Back to venue
-        </Link>
-
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground mb-1">Book Appointment</h1>
-              <p className="text-muted-foreground">Select a date and time for your appointment</p>
+            <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-3 mb-4"><h2 className="font-semibold">Available times</h2><Button variant="ghost" size="sm" disabled={slotsLoading || saving} onClick={() => setReload(value => value + 1)}>Refresh</Button></div>
+              {slotsLoading ? <p role="status" className="py-6 text-sm text-muted-foreground">Checking availability…</p> : slotError ? <p role="alert" className="text-sm text-red-700">{slotError}</p> : slots.length ? <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{slots.map(slot => <Button key={slot.start_time} variant={selected?.start_time === slot.start_time ? "default" : "outline"} disabled={!slot.available || saving} aria-pressed={selected?.start_time === slot.start_time} onClick={() => setSelected(slot)} className="h-auto min-h-11 whitespace-normal text-xs">{time(slot.start_time)}{!slot.available && <span className="sr-only"> unavailable</span>}</Button>)}</div> : <p className="text-sm text-muted-foreground py-6">No appointments on this day. Try another date.</p>}
             </div>
-
-            {/* Date Selector */}
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-semibold text-foreground flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Select Date
-                </h2>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="icon" onClick={prevDay}>
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <span className="font-medium text-foreground min-w-[180px] text-center">
-                    {selectedDate.toLocaleDateString("en-US", {
-                      weekday: "long",
-                      month: "long",
-                      day: "numeric",
-                    })}
-                  </span>
-                  <Button variant="outline" size="icon" onClick={nextDay}>
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Time Slots */}
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Available Times
-              </h2>
-
-              {timeSlots.length > 0 ? (
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                  {timeSlots.map((slot, index) => (
-                    <button
-                      key={index}
-                      onClick={() => slot.available && setSelectedSlot(slot)}
-                      disabled={!slot.available}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        selectedSlot?.start.getTime() === slot.start.getTime()
-                          ? "bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-md shadow-violet-500/25"
-                          : slot.available
-                            ? "bg-white border border-gray-200 text-gray-900 hover:border-blue-300 hover:bg-blue-50"
-                            : "bg-gray-50 text-gray-300 cursor-not-allowed"
-                      }`}
-                    >
-                      {formatTime(slot.start)}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <Clock className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-muted-foreground">
-                    No available times for this date.
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Try selecting a different day.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Sidebar - Booking Summary */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl border border-gray-200 p-5 sticky top-24">
-              {/* Service Info */}
-              <div className="flex gap-4 pb-4 border-b border-gray-100 mb-4">
-                <div className="w-20 h-20 rounded-lg bg-gray-100 overflow-hidden relative flex-shrink-0">
-                  {venue.image_url && (
-                    <Image
-                      src={venue.image_url}
-                      alt={venue.name}
-                      fill
-                      className="object-cover"
-                    />
-                  )}
-                </div>
-                <div>
-                  <h3 className="font-semibold text-foreground">{service.name}</h3>
-                  <p className="text-sm text-muted-foreground">{venue.name}</p>
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
-                    <MapPin className="h-3.5 w-3.5" />
-                    {venue.campus}
-                  </div>
-                </div>
-              </div>
-
-              {/* Booking Details */}
-              <div className="space-y-3 text-sm mb-4">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Duration</span>
-                  <span className="font-medium text-foreground">{service.duration} mins</span>
-                </div>
-                {selectedSlot && (
-                  <>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Date</span>
-                      <span className="font-medium text-foreground">
-                        {selectedSlot.start.toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Time</span>
-                      <span className="font-medium text-foreground">
-                        {formatTime(selectedSlot.start)}
-                      </span>
-                    </div>
-                  </>
-                )}
-                <div className="flex justify-between pt-3 border-t border-gray-100">
-                  <span className="font-medium text-foreground">Total</span>
-                  <span className="font-bold text-foreground text-lg">${service.price}</span>
-                </div>
-              </div>
-
-              {/* Error */}
-              {error && (
-                <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm mb-4">
-                  {error}
-                </div>
-              )}
-
-              {/* Book Button */}
-              <Button 
-                className="w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 shadow-lg shadow-violet-500/25" 
-                size="lg"
-                onClick={handleBook}
-                disabled={!selectedSlot || booking}
-              >
-                {booking ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : null}
-                {selectedSlot ? "Confirm Booking" : "Select a Time Slot"}
-              </Button>
-
-              <p className="text-xs text-muted-foreground text-center mt-3">
-                You won&apos;t be charged until the appointment is confirmed.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+          </section>
+          <aside className="bg-white rounded-xl border border-gray-200 p-5 self-start lg:sticky lg:top-24">
+            <p className="text-sm text-muted-foreground mb-1">{venue.name}</p><h2 className="text-xl font-semibold mb-3">{service.name}</h2>
+            <p className="flex gap-2 text-sm text-muted-foreground mb-2"><MapPin className="h-4 w-4 shrink-0" />{venue.campus}</p><p className="flex gap-2 text-sm text-muted-foreground"><Clock className="h-4 w-4" />{service.duration} minutes</p>
+            {selected && <p className="text-sm mt-5">{date(selected.start_time)}<br />{time(selected.start_time)}–{time(selected.end_time)}</p>}
+            <p className="font-semibold text-xl border-t mt-5 pt-5">${Number(service.price).toFixed(2)}</p>
+            <p className="text-xs text-muted-foreground mt-2 mb-5">Pay the provider directly. VenU does not collect payment.</p>
+            {error && <p role="alert" className="text-sm text-red-700 mb-4">{error}</p>}
+            <Button className="w-full" onClick={requestBooking} disabled={!selected || saving || slotsLoading}>{saving ? "Sending request…" : "Request appointment"}</Button>
+          </aside>
+        </div>}
+    </main>
+  </div>;
 }
-

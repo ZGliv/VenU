@@ -16,6 +16,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "./auth-provider";
+import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 
 interface RouteGuardProps {
@@ -41,7 +42,7 @@ export function RouteGuard({
   redirectTo = "/auth/signin"
 }: RouteGuardProps) {
   const router = useRouter();
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, profileError, refreshProfile, signOut } = useAuth();
 
   useEffect(() => {
     // Still loading auth state
@@ -91,6 +92,9 @@ export function RouteGuard({
       </div>
     );
   }
+
+  if (user && !profile) return <div className="max-w-lg mx-auto p-8"><h1 className="text-xl font-semibold mb-3">Account unavailable</h1><p role="alert" className="mb-4 text-muted-foreground">{profileError || "Your profile could not be loaded."}</p><Button onClick={refreshProfile}>Retry account</Button><Button variant="ghost" onClick={signOut}>Sign out</Button></div>;
+  if (profile?.status === "suspended") return <div className="max-w-lg mx-auto p-8"><h1 className="text-xl font-semibold mb-3">Account suspended</h1><p className="text-muted-foreground">Contact the VenU administrator to review your account.</p></div>;
 
   // Wrong role
   if (user && profile && allowedRoles && !allowedRoles.includes(profile.role)) {

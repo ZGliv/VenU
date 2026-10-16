@@ -57,50 +57,26 @@ interface Venue {
 export default function LandingPage() {
   // Memoize Supabase client to prevent recreation on every render
   const supabase = useMemo(() => createClient(), []);
-  const [campus, setCampus] = useState("State University");
-  const [featuredVenues, setFeaturedVenues] = useState<Venue[]>([]);
+  const [campus, setCampus] = useState("All campuses");
+  const [allVenues, setAllVenues] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Fetch venues when campus changes
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    async function fetchVenues() {
-      setLoading(true);
-      const { data: featured } = await supabase
-        .from("venues")
-        .select("*")
-        .eq("campus", campus)
-        .limit(8);
-      
-      if (featured) setFeaturedVenues(featured);
+    let current = true;
+    supabase.from("venues").select("id,name,description,campus,category,image_url").eq("status", "approved").order("name").then(({ data, error }) => {
+      if (!current) return;
+      if (error) setError("Providers are unavailable right now. Please try Explore again shortly.");
+      else setAllVenues(data || []);
       setLoading(false);
-    }
-    fetchVenues();
-  }, [campus, supabase]);
-
-  // Available campuses with logo and metadata
-  const campusData = [
-    { 
-      name: "State University", 
-      abbr: "SU", 
-      location: "Main Campus",
-      color: "from-blue-600 to-blue-700",
-      students: "45,000+"
-    },
-    { 
-      name: "Ivy College", 
-      abbr: "IC", 
-      location: "Downtown",
-      color: "from-emerald-600 to-emerald-700",
-      students: "12,000+"
-    },
-    { 
-      name: "Tech Institute", 
-      abbr: "TI", 
-      location: "Tech Park",
-      color: "from-violet-600 to-violet-700",
-      students: "8,000+"
-    },
-  ];
+    });
+    return () => { current = false; };
+  }, [supabase]);
+  const campusVenues = campus === "All campuses" ? allVenues : allVenues.filter(venue => venue.campus === campus);
+  const featuredVenues = campusVenues.slice(0, 8);
+  const campusData = ["All campuses", ...Array.from(new Set(allVenues.map(venue => venue.campus))).sort()].map(name => ({
+    name, abbr: name === "All campuses" ? "VU" : name.split(" ").map(word => word[0]).join("").slice(0, 3),
+    location: name === "All campuses" ? "Browse all approved listings" : "Campus services", color: "from-blue-600 to-blue-700",
+  }));
   
   // Get current campus data
   const currentCampus = campusData.find(c => c.name === campus) || campusData[0];
@@ -191,34 +167,35 @@ export default function LandingPage() {
                 
                 {/* Subheadline */}
                 <p className="text-lg lg:text-xl text-slate-600 max-w-xl mb-8 animate-slide-up" style={{ animationDelay: "100ms" }}>
-                  Discover student entrepreneurs and trusted local providers—haircuts, 
+                  Discover student entrepreneurs and local providers—haircuts,
                   tutoring, food, tech help, and more—without leaving your routine.
                 </p>
                 
                 {/* Search Bar */}
                 <div className="max-w-xl mb-6 animate-slide-up" style={{ animationDelay: "200ms" }}>
-                  <div className="flex items-center gap-2 p-2 bg-white rounded-2xl shadow-elevation-3 border border-slate-200/50">
+                  <form action="/explore" className="flex items-center gap-2 p-2 bg-white rounded-2xl shadow-elevation-3 border border-slate-200/50">
+                    <input type="hidden" name="campus" value={campus} />
                     <div className="flex-1 flex items-center gap-3 px-4">
                       <Search className="h-5 w-5 text-slate-400 flex-shrink-0" />
                       <Input 
-                        type="text" 
+                        type="search" name="q" aria-label="Search campus services"
                         placeholder="Search haircuts, tutoring, food, tech..."
                         className="border-0 shadow-none focus-visible:ring-0 bg-transparent h-12 text-base placeholder:text-slate-400"
                       />
                     </div>
-                    <Button 
+                    <Button type="submit"
                       size="lg" 
                       className="h-12 px-6 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-medium transition-all hover:shadow-lg"
                     >
                       Search
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
-                  </div>
+                  </form>
                   
                   {/* Trust Badge - Inline with search */}
                   <div className="flex items-center gap-2 mt-3 text-sm text-slate-500">
                     <Shield className="h-4 w-4 text-emerald-500" />
-                    <span>Providers verified by campus communities</span>
+                    <span>Listings reviewed before they appear here</span>
                   </div>
                 </div>
                 
@@ -292,7 +269,7 @@ export default function LandingPage() {
                               <MapPin className="h-3 w-3" />
                               {c.location}
                               <span className="text-slate-300">|</span>
-                              <span>{c.students} students</span>
+                              <span>Browse listings</span>
                             </div>
                           </div>
                           {campus === c.name && (
@@ -308,7 +285,7 @@ export default function LandingPage() {
                 <div className="col-span-2 bg-white rounded-2xl p-4 shadow-elevation-2 border border-slate-100 hover:shadow-elevation-3 transition-all group">
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <h3 className="font-semibold text-slate-900 text-sm">Popular right now</h3>
+                      <h3 className="font-semibold text-slate-900 text-sm">Discover providers</h3>
                     </div>
                     <Link 
                       href={`/explore?campus=${encodeURIComponent(campus)}`}
@@ -352,10 +329,7 @@ export default function LandingPage() {
                           <h4 className="font-medium text-slate-900 truncate text-sm">{venue.name}</h4>
                           <p className="text-xs text-slate-500">{venue.category}</p>
                         </div>
-                        <div className="flex items-center gap-1 text-xs font-medium text-slate-900">
-                          <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                          4.9
-                        </div>
+
                       </Link>
                     ))}
                   </div>
@@ -392,7 +366,7 @@ export default function LandingPage() {
                       <TrendingUp className="h-4 w-4 text-blue-600" />
                     </div>
                     <div>
-                      <div className="text-xl font-bold text-slate-900">60+</div>
+                      <div className="text-xl font-bold text-slate-900">{loading || error ? "—" : campusVenues.length}</div>
                       <div className="text-xs text-slate-500">Providers</div>
                     </div>
                   </div>
@@ -404,7 +378,7 @@ export default function LandingPage() {
                       <Zap className="h-4 w-4 text-violet-600" />
                     </div>
                     <div>
-                      <div className="text-xl font-bold text-slate-900">10+</div>
+                      <div className="text-xl font-bold text-slate-900">{loading || error ? "—" : new Set(campusVenues.map(venue => venue.category)).size}</div>
                       <div className="text-xs text-slate-500">Categories</div>
                     </div>
                   </div>
@@ -494,10 +468,10 @@ export default function LandingPage() {
                 <div>
                   <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 text-amber-600 text-sm font-medium mb-4">
                     <Star className="h-3.5 w-3.5 fill-amber-500" />
-                    Top rated
+                    Explore providers
                   </div>
-                  <h2 className="text-3xl lg:text-4xl font-bold text-slate-900">Popular at {campus}</h2>
-                  <p className="text-slate-500 mt-2 text-lg">Highly-rated providers trusted by students</p>
+                  <h2 className="text-3xl lg:text-4xl font-bold text-slate-900">Providers · {campus}</h2>
+                  <p className="text-slate-500 mt-2 text-lg">Explore services and request an appointment</p>
                 </div>
                 <Link href={`/explore?campus=${encodeURIComponent(campus)}`}>
                   <Button variant="outline" className="border-slate-200 hover:bg-white hover:border-slate-300 text-slate-700">
@@ -536,10 +510,7 @@ export default function LandingPage() {
                           className="object-cover group-hover:scale-105 transition-transform duration-500"
                         />
                         {/* Rating Badge */}
-                        <div className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/95 backdrop-blur-sm shadow-lg text-sm font-semibold">
-                          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                          4.9
-                        </div>
+
                       </div>
                       <div>
                         <h3 className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1">
@@ -558,7 +529,7 @@ export default function LandingPage() {
                 <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
                   <Search className="h-7 w-7 text-slate-400" />
                 </div>
-                <p className="text-slate-600 mb-4">No providers found for {campus} yet.</p>
+                <p className="text-slate-600 mb-4">{error || `No providers found for ${campus} yet.`}</p>
                 <Link href="/become-provider">
                   <Button className="bg-slate-900 hover:bg-slate-800 text-white">
                     Become the first provider

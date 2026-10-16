@@ -61,12 +61,13 @@ export default async function VenuePage({
   params, 
   searchParams 
 }: { 
-  params: { id: string };
-  searchParams: { from?: string };
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
 }) {
   // Determine if user came from admin venue management
-  const isFromAdmin = searchParams.from === "admin";
-  const supabase = createClient();
+  const resolvedParams = await params;
+  const isFromAdmin = (await searchParams).from === "admin";
+  const supabase = await createClient();
   
   // Fetch venue details with services and owner info (including bio for provider profile)
   // Use explicit relationship name because venues has two FKs to users (owner_id and status_updated_by)
@@ -74,14 +75,9 @@ export default async function VenuePage({
     .from("venues")
     .select(`
       *,
-      services (*),
-      users!venues_owner_id_fkey (
-        name,
-        avatar_url,
-        bio
-      )
+      services (*)
     `)
-    .eq("id", params.id)
+    .eq("id", resolvedParams.id)
     .single();
 
   // Handle connection errors separately from not found
@@ -157,10 +153,7 @@ export default async function VenuePage({
                                 <MapPin className="h-4 w-4" />
                   {typedVenue.campus}
                             </div>
-                            <div className="flex items-center gap-1">
-                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                                4.9 (120 reviews)
-                            </div>
+
                         </div>
             </div>
           </div>
@@ -245,9 +238,9 @@ export default async function VenuePage({
               <div className="lg:sticky lg:top-24 space-y-4">
                 {/* Provider Card */}
                 <ProviderCard
-                  providerName={typedVenue.users?.name || null}
-                  providerAvatar={typedVenue.users?.avatar_url || null}
-                  providerBio={typedVenue.users?.bio || null}
+                  providerName={typedVenue.provider_name || null}
+                  providerAvatar={null}
+                  providerBio={null}
                   venueName={typedVenue.name}
                   providerContactName={typedVenue.provider_name || null}
                   providerEmail={typedVenue.provider_email || null}

@@ -22,7 +22,7 @@
 import { Navbar } from "@/components/navbar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, SlidersHorizontal, MapPin, ArrowLeft } from "lucide-react";
+import { Search, MapPin, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -42,23 +42,27 @@ interface Venue {
 
 export default function ExploreContent() {
   const searchParams = useSearchParams();
-  const campus = searchParams.get("campus") || "State University";
+  const campus = searchParams.get("campus") || "All campuses";
   const [selectedCategory, setSelectedCategory] = useState<string>(searchParams.get("category") || "All");
   const [venues, setVenues] = useState<Venue[]>([]);
   const [categories, setCategories] = useState<string[]>(["All"]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
   // Memoize Supabase client to prevent recreation on every render
   const supabase = useMemo(() => createClient(), []);
 
   // Fetch all categories for the campus
   useEffect(() => {
     async function fetchCategories() {
-      const { data } = await supabase
+      let query = supabase
         .from("venues")
         .select("category")
-        .eq("campus", campus)
+        .eq("status", "approved")
         .not("category", "is", null);
+      if (campus !== "All campuses") query = query.eq("campus", campus);
+      const { data } = await query;
 
       if (data) {
         const uniqueCategories = Array.from(new Set(data.map(v => v.category).filter(Boolean)));
@@ -70,8 +74,9 @@ export default function ExploreContent() {
 
   // Fetch venues when campus or category changes
   useEffect(() => {
+    let current = true;
     async function fetchVenues() {
-      setLoading(true);
+      setLoading(true); setError(null);
       let query = supabase
         .from("venues")
         .select(`
@@ -80,7 +85,8 @@ export default function ExploreContent() {
             price
           )
         `)
-        .eq("campus", campus);
+        .eq("status", "approved");
+      if (campus !== "All campuses") query = query.eq("campus", campus);
 
       if (selectedCategory !== "All") {
         query = query.eq("category", selectedCategory);
@@ -88,8 +94,10 @@ export default function ExploreContent() {
 
       const { data, error } = await query;
 
+      if (!current) return;
       if (error) {
-        console.error("Error fetching venues:", error);
+        setError("We couldn’t load providers. Please retry when your connection is ready.");
+        setVenues([]);
       } else {
         setVenues(data || []);
       }
@@ -97,7 +105,8 @@ export default function ExploreContent() {
     }
 
     fetchVenues();
-  }, [campus, selectedCategory, supabase]);
+    return () => { current = false; };
+  }, [campus, selectedCategory, supabase, reload]);
 
   // Filter venues by search query (matches venue name or description)
   const filteredVenues = venues.filter(venue => 
@@ -140,16 +149,13 @@ export default function ExploreContent() {
              <div className="relative flex-1 md:w-80">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
-                  placeholder="Search providers..." 
+                  aria-label="Search providers" placeholder="Search providers..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9 bg-white border-gray-200 focus-visible:ring-primary/20"
                 />
              </div>
-            <Button variant="outline" className="border-gray-200 bg-white hover:bg-gray-50">
-              <SlidersHorizontal className="h-4 w-4 mr-2" />
-                Filters
-             </Button>
+
           </div>
         </div>
 
@@ -172,7 +178,7 @@ export default function ExploreContent() {
 
         {/* Results count */}
         <div className="text-sm text-muted-foreground mb-6">
-          {loading ? "Loading..." : `${filteredVenues.length} provider${filteredVenues.length !== 1 ? "s" : ""} found`}
+          {error ? "Providers unavailable" : loading ? "Loading..." : `${filteredVenues.length} provider${filteredVenues.length !== 1 ? "s" : ""} found`}
         </div>
 
         {/* Grid */}
@@ -187,7 +193,7 @@ export default function ExploreContent() {
               </div>
             ))}
           </div>
-        ) : filteredVenues.length > 0 ? (
+        ) : error ? <div role="alert" className="bg-white border rounded-xl p-6"><p className="text-muted-foreground mb-4">{error}</p><Button onClick={() => setReload(value => value + 1)}>Retry providers</Button></div> : filteredVenues.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredVenues.map((venue) => (
               <VenueCard key={venue.id} venue={venue} />

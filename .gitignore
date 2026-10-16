@@ -36,3 +36,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+
+# Isolated integration database and QA artifacts
+.local-pg/
+output/
+!.env.example
+
+.playwright-cli/

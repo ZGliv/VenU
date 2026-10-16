@@ -6,7 +6,7 @@ This document outlines the project structure and how everything works together.
 
 ### Architecture Overview
 
-VenU is built using **Next.js 14+ with the App Router**, which uses React Server Components by default. The project follows a clean separation of concerns:
+VenU is built using **Next.js 15.5.28 with the App Router**, which uses React Server Components by default. The project follows a clean separation of concerns:
 
 1. **Routes & Pages** (`src/app/`): Each folder represents a route, with `page.tsx` as the page component
 2. **Components** (`src/components/`): Reusable UI components, separated into generic UI and feature-specific components
@@ -14,7 +14,7 @@ VenU is built using **Next.js 14+ with the App Router**, which uses React Server
 
 ### Key Technologies
 
-- **Framework**: Next.js 14+ (App Router)
+- **Framework**: Next.js 15.5.28 (App Router)
 - **Database**: Supabase (PostgreSQL)
 - **Styling**: Tailwind CSS + Shadcn UI components
 - **Language**: TypeScript
@@ -36,19 +36,11 @@ VenU is built using **Next.js 14+ with the App Router**, which uses React Server
 5. Server components use `src/lib/supabase/server.ts` to access user data
 6. Client components use `src/lib/supabase/client.ts` for browser-side operations
 
-### Protected Admin Emails
+### Authorization and profile privacy
 
-To ensure certain users always have admin access (even after database resets), set the `NEXT_PUBLIC_ADMIN_EMAILS` environment variable in your `.env.local` file:
+Signup creates a student profile through the database trigger. Browser sign-in only reads that record. It cannot assign administrator roles. An active student may become a provider; account suspension and administrator promotion require a trusted administrator/database operator. `NEXT_PUBLIC_ADMIN_EMAILS` is no longer used.
 
-```bash
-NEXT_PUBLIC_ADMIN_EMAILS=you@gmail.com,buddy@gmail.com
-```
-
-When these users sign in:
-- If their account exists but has a non-admin role, it will be automatically upgraded to admin
-- If their account is new, it will be created with the admin role
-
-This is handled by `src/components/providers/auth-provider.tsx`.
+`private` helpers have fixed empty search paths and explicit execution grants. The slot helper is privileged only to inspect occupied provider times; its public invoker wrapper returns start/end/availability without booking or customer identifiers. All booking writes and status changes remain security-invoker operations protected by RLS, triggers, and a PostgreSQL exclusion constraint.
 
 ### Styling System
 
@@ -199,6 +191,7 @@ supabase (PostgreSQL)
     │   ├── name (TEXT, NOT NULL)                      # Venue name
     │   ├── description (TEXT)                         # Venue description
     │   ├── campus (TEXT, NOT NULL)                    # Campus location (multi-tenant key)
+    │   ├── timezone (TEXT, nullable)                # Provider-confirmed IANA timezone; NULL blocks new bookings
     │   ├── category (TEXT)                            # Venue category (Beauty, Food, Tech, etc.)
     │   ├── status (TEXT)                              # 'pending' | 'approved' | 'rejected'
     │   ├── admin_message (TEXT)                       # Admin approval/rejection message
@@ -225,6 +218,7 @@ supabase (PostgreSQL)
     ├── bookings                                     # User bookings/appointments
     │   ├── id (UUID, PK)                              # Unique booking identifier
     │   ├── user_id (UUID, FK)                         # References users.id (student booking)
+    │   ├── provider_id (UUID, FK, NOT NULL)           # Server-derived provider snapshot, overlap/isolation key
     │   ├── service_id (UUID, FK)                      # References services.id
     │   ├── start_time (TIMESTAMP, NOT NULL)           # Booking start time
     │   ├── end_time (TIMESTAMP, NOT NULL)             # Booking end time (calculated)
@@ -291,36 +285,19 @@ User (venue_owner)
 
 ### Row Level Security (RLS) Policies
 
-#### Users Table
-- **SELECT**: Public (everyone can view profiles)
-- **UPDATE**: Users can only update their own profile
-
-#### Venues Table
-- **SELECT**: Public (everyone can view venues)
-- **INSERT/DELETE**: Only venue owners can manage their own venues
-- **UPDATE**: Venue owners can update their own venues; Admins can update any venue (for status changes)
-
-#### Services Table
-- **SELECT**: Public (everyone can view services)
-- **INSERT/UPDATE/DELETE**: Only venue owners can manage services for their venues
-
-#### Bookings Table
-- **SELECT**: Users can view their own bookings; venue owners can view bookings for their services
-- **INSERT**: Users can create bookings for themselves
-
-#### Reviews Table
-- **SELECT**: Public (everyone can view reviews)
-- **INSERT**: Users can create reviews for their completed bookings only
-
-#### Favorites Table
-- **SELECT**: Users can view their own favorites
-- **INSERT**: Users can add their own favorites
-- **DELETE**: Users can remove their own favorites
+- **Users:** read by the account, its booking provider, or an active administrator. Anonymous access is revoked. Users can edit their own nonprivileged profile fields; a trigger blocks role/status/identity tampering. Signup creation is restricted to the auth trigger.
+- **Venues:** approved listings are publicly discoverable. Owners can read their own drafts and administrators can review all listings. A trigger prevents self-approval and ownership changes; providers cannot change admin fields.
+- **Services/availability:** public visibility follows the associated listing. Writes require venue ownership. Schedule replacement uses a single transaction.
+- **Bookings:** customers see their own requests, providers see their assigned reservations, and administrators can inspect them. Anonymous access is revoked. Participant status updates obey a server-enforced state machine. Provider changes use the stored provider snapshot rather than a client-provided owner.
+- **Reviews:** public read; only the customer of a completed booking can submit its review. A complete review UI is not implemented.
+- **Favorites:** only the owner can read, add, or remove their favorites.
 
 ### Database Constraints
 
 - **Multi-tenancy**: Data is filtered by `campus` column (not enforced at DB level, handled in application)
-- **Price constraints**: All prices must be >= 0
+- **Booking integrity**: provider-wide GiST exclusion prevents overlapping pending/confirmed bookings across every service and listing. Adjacent appointments are allowed. End time, provider and price are derived from the service on insert; booking identity, price and times are immutable.
+- **Schedule**: IANA timezone must be explicitly saved. Slot starts follow 30-minute intervals, must fit the weekly window and the service duration, and be within 30 days. DST produces actual UTC instants. Invalid schedule replacement rolls back in full.
+- **Price constraints**: All prices must be >= 0; service duration is 5–720 minutes
 - **Rating constraints**: Reviews must be between 1-5
 - **Status constraints**: Bookings and roles use CHECK constraints for valid values
 - **Unique constraints**: Email addresses and booking reviews are unique
@@ -335,8 +312,26 @@ User (venue_owner)
 - `idx_favorites_user_id`: Index on `favorites.user_id` for faster user lookups
 - `idx_favorites_venue_id`: Index on `favorites.venue_id` for faster venue lookups
 
+### Booking implementation files
+
+- `supabase/migrations/20261016031955_enforce_booking_integrity.sql`: forward migration, preserving historical data or aborting on inconsistent rows.
+- `src/lib/booking.ts`: shared errors, timezone date formatting and safe internal sign-in return paths.
+- `src/app/book/[venueId]/[serviceId]/page.tsx`: server-issued slots and pending booking receipt.
+- `src/app/provider/availability/page.tsx`: explicit timezone and atomic weekly schedule.
+- `src/app/provider/bookings/page.tsx`, `src/app/dashboard/bookings/page.tsx`: provider response and customer cancellation with expected-state checks.
+- `scripts/test-db.sh`, `scripts/check-booking-integrity.py`: disposable PostgreSQL integration suite.
+- `scripts/check-booking-ui.js`: synthetic browser contract suite, distinct from live acceptance.
+
 ### Database Triggers & Functions
 
 - **handle_new_user()**: Automatically creates a `public.users` record when a new user signs up via Supabase Auth
 - **on_auth_user_created**: Trigger that calls `handle_new_user()` on new auth user creation
 
+
+- `public.list_booking_slots(service, booking_day)`: authenticated, privacy-preserving availability RPC. A private, tightly scoped helper checks occupied times across all provider services.
+- `public.change_booking_status(booking, expected_status, new_status)`: atomic compare-and-update; stale UI gets a conflict instead of silently overwriting another participant.
+- `public.save_provider_schedule(venue, timezone_name, days)`: owner-only atomic replacement; failures retain the previous schedule.
+- `private.guard_profile`, `private.guard_venue`, `private.guard_booking`: immutable identity and authorization/state checks.
+- `private.preserve_booking_history`: prevents service/listing deletion from silently cascading away existing appointments.
+
+Hosted release remains pending. See [restoration and verification boundaries](RESTORE.md).

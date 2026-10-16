@@ -44,7 +44,7 @@ export default function RootLayout({
           {children}
           <Toaster 
             position="bottom-right" 
-            maxVisibleToasts={1}
+            visibleToasts={1}
             toastOptions={{
               className: "bg-white border border-gray-200 shadow-lg",
               style: {

@@ -1,55 +1,26 @@
-# VenU Master Plan & Documentation
+# VenU
 
-## 1. Vision
-**"Noona for College Campuses"**
+**Campus talent, one booking away.**
 
-VenU is a centralized service marketplace for university campuses. It aggregates fragmented local services—barbers, photographers, tutors, and event spaces—into a single, location-aware platform.
+VenU brings campus services into a shared marketplace. Students discover approved providers, choose a service, request an available appointment, and track the provider’s response. Providers publish services and prices, set a weekly schedule, and manage appointments. Payment happens directly with the provider.
 
-**Elevator Pitch:**
-VenU connects students with local service providers directly. Instead of scrolling Instagram or reading flyers, students can find, book, and pay for services instantly. For providers (student entrepreneurs and locals), it offers a turnkey backend for bookings and payments.
+## Implemented in the October 2026 branch
 
-## 2. Core Features (MVP)
+- Campus/category/search discovery based on approved listings. Campuses come from actual listings; new providers enter their own campus.
+- Service requests with provider timezone, server-issued slots, authoritative prices/duration, and provider-wide overlap protection.
+- Pending → confirmed/declined → completed provider workflow; customers can cancel before an appointment starts. Stale transitions are rejected.
+- Atomic weekly schedule saves, explicit timezone setup, profile/approval protection, participant privacy and retained booking history.
+- Honest pending receipts and recovery states. Fabricated ratings, population counts, and the obsolete payment-placeholder flow have been removed.
+- Patched Next.js/Supabase dependencies, successful local production build, PostgreSQL integration tests, and browser contract checks at 375px and 1440px.
 
-### Hyper-Local Exploration
-*   **Campus Context:** Users view listings specific to their university (e.g., "State University").
-*   **Service Categories:** Filter by Beauty, Academic, Events, Food, etc.
+## Release gate
 
-### Service-Based Booking
-*   **Granular Listings:** Users book specific services (e.g., "Fade Haircut - 30m - $25") rather than generic "venue" slots.
-*   **Real-Time Availability:** Providers manage their schedule; users see open slots instantly.
-*   **Booking Flow:** Select Service -> Select Time -> Confirm.
+The historical Supabase project is unavailable. This branch is **not a verified live MVP yet**. [Restore and release steps](RESTORE.md) cover backend selection, preservation of any recoverable data, migrations, actual hosted OAuth, isolated multi-account acceptance tests, and Vercel preview before promotion. Historical seed data is fictional and must not be presented as real providers.
 
-### Provider Tools
-*   **Profile Management:** Service menu, pricing, and portfolio.
-*   **Schedule Management:** Block out class times, open availability.
+## Next milestones
 
-## 3. Roadmap
-
-### Phase 1: Foundation (Complete)
-*   [x] Project Initialization (Clean Slate).
-*   [x] Database Schema (Multi-tenant, Service-oriented).
-*   [x] Authentication (Supabase Auth with Google OAuth).
-
-### Phase 2: The Service Model (Complete)
-*   [x] Seed Data Generation (Realistic dataset for 3 campuses).
-*   [x] Explore Page (Campus selector, Category filters).
-*   [x] Venue/Provider Profile Pages.
-
-### Phase 3: Booking Flow (Complete)
-*   [x] Service Selection UI.
-*   [x] Booking Logic (Time slots based on availability, Conflict detection).
-*   [x] User Dashboard (My Bookings, Settings).
-*   [x] Provider Dashboard (Venues, Services, Availability, Bookings).
-
-### Phase 4: Admin & Polish (Complete)
-*   [x] Admin Dashboard (Metrics, User management, Venue approval).
-*   [x] Role-based access control.
-*   [x] Light mode aesthetic with modern design.
-*   [x] Mobile Responsiveness.
-*   [x] Ready for Vercel deployment.
-
-## 4. Future Concepts
-*   **Social:** See friends' bookings.
-*   **Payments:** Stripe integration.
-*   **Reviews:** Verified user feedback.
-
+1. Restore or replace the owned backend and verify the full hosted student/provider/administrator flow.
+2. Run a small campus pilot with consenting providers: real service details, prices, timezone and availability; test missed/declined appointments and support needs.
+3. Add one-off schedule exceptions, rescheduling and a clearly defined request-expiry policy.
+4. Add opt-in notifications and calendar export when delivery settings and consent are established.
+5. Complete verified reviews after actual completed appointments. Consider payments only after the service workflow and operating model are proven.

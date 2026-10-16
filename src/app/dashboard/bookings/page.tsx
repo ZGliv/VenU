@@ -17,6 +17,7 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/providers/auth-provider";
 import { createClient } from "@/lib/supabase/client";
+import { bookingError } from "@/lib/booking";
 import { Button } from "@/components/ui/button";
 import { 
   ClipboardList,
@@ -57,13 +58,15 @@ export default function UserBookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
 
   // Fetch bookings
   useEffect(() => {
     if (!user) return;
 
     async function fetchBookings() {
-      setLoading(true);
+      setLoading(true); setError(null);
       const { data, error } = await supabase
         .from("bookings")
         .select(`
@@ -84,30 +87,25 @@ export default function UserBookingsPage() {
 
       if (!error) {
         setBookings(data || []);
-      }
+      } else setError("We couldn’t load your bookings. Refresh to try again.");
       setLoading(false);
     }
 
     fetchBookings();
-  }, [user, supabase]);
+  }, [user, supabase, reload]);
 
   /**
    * Cancels a booking.
    */
   const cancelBooking = async (bookingId: string) => {
-    if (!confirm("Are you sure you want to cancel this booking?")) return;
-
-    setCancelling(bookingId);
-    const { error } = await supabase
-      .from("bookings")
-      .update({ status: "cancelled" })
-      .eq("id", bookingId);
-
-    if (!error) {
-      setBookings(prev => prev.map(b => 
-        b.id === bookingId ? { ...b, status: "cancelled" } : b
-      ));
-    }
+    const previous = bookings.find(booking => booking.id === bookingId);
+    if (!previous || cancelling || !confirm("Cancel this appointment? The provider will see that it was cancelled.")) return;
+    setCancelling(bookingId); setError(null);
+    const { data, error } = await supabase.rpc("change_booking_status", {
+      booking: bookingId, expected_status: previous.status, new_status: "cancelled",
+    });
+    if (error || !data) setError(bookingError(error));
+    else setBookings(current => current.map(booking => booking.id === bookingId ? { ...booking, status: data.status } : booking));
     setCancelling(null);
   };
 
@@ -150,10 +148,10 @@ export default function UserBookingsPage() {
 
   // Group bookings
   const upcomingBookings = bookings.filter(b => 
-    ["pending", "confirmed"].includes(b.status) && new Date(b.start_time) >= new Date()
+    ["pending", "confirmed"].includes(b.status) && new Date(b.end_time) >= new Date()
   );
   const pastBookings = bookings.filter(b => 
-    b.status === "completed" || b.status === "cancelled" || new Date(b.start_time) < new Date()
+    b.status === "completed" || b.status === "cancelled" || new Date(b.end_time) < new Date()
   );
 
   if (loading) {
@@ -177,10 +175,11 @@ export default function UserBookingsPage() {
         </Link>
         <h1 className="text-2xl font-bold text-foreground mb-1">My Bookings</h1>
         <p className="text-muted-foreground">
-          View and manage your appointments
+          View and manage your appointments. Times use your device’s timezone.
         </p>
       </div>
 
+      <div className="mb-5 flex flex-wrap items-center gap-3"><Button variant="outline" disabled={Boolean(cancelling)} onClick={() => setReload(value => value + 1)}>Refresh bookings</Button>{error && <p role="alert" className="text-sm text-red-700">{error}</p>}</div>
       {/* Upcoming Bookings */}
       <div className="mb-10">
         <h2 className="text-lg font-semibold text-foreground mb-4">Upcoming</h2>
@@ -241,7 +240,7 @@ export default function UserBookingsPage() {
                         </p>
                       </div>
 
-                      {booking.status === "pending" && (
+                      {["pending", "confirmed"].includes(booking.status) && new Date(booking.start_time) > new Date() && (
                         <Button
                           variant="outline"
                           size="sm"

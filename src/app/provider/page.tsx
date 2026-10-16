@@ -116,7 +116,7 @@ export default function ProviderDashboard() {
                 price,
                 venues (name)
               ),
-              users (name, email)
+              users!bookings_user_id_fkey (name, email)
             `)
             .in("service_id", serviceIds)
             .order("created_at", { ascending: false });

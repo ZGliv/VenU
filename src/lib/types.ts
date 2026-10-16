@@ -15,6 +15,7 @@ export interface Venue {
   name: string;
   description: string | null;
   campus: string;
+  timezone: string | null;
   image_url: string | null;
   category: string;
   status: "pending" | "approved" | "rejected";
@@ -50,6 +51,7 @@ export interface Booking {
   id: string;
   user_id: string;
   service_id: string;
+  provider_id: string;
   start_time: string;
   end_time: string;
   status: "pending" | "confirmed" | "completed" | "cancelled";

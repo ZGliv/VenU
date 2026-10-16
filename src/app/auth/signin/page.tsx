@@ -15,9 +15,10 @@
 
 "use client";
 
-import { Suspense, useEffect, useMemo } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
+import { safeReturnPath } from "@/lib/booking";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/providers/auth-provider";
 import Link from "next/link";
@@ -29,10 +30,13 @@ function SignInContent() {
   const searchParams = useSearchParams();
   // Memoize Supabase client to prevent recreation on every render
   const supabase = useMemo(() => createClient(), []);
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, profileError, refreshProfile } = useAuth();
+  const [signInError, setSignInError] = useState<string | null>(null);
+  const [signingIn, setSigningIn] = useState(false);
+  const returnTo = safeReturnPath(searchParams.get("next"));
   
   // Get error message from URL if present
-  const errorMessage = searchParams.get("error");
+  const errorMessage = signInError || profileError || searchParams.get("error");
 
   // Redirect if already signed in with a valid profile
   // Only redirect if BOTH user AND profile exist (profile confirms user is in database)
@@ -41,25 +45,23 @@ function SignInContent() {
       if (user && profile) {
         // User is fully authenticated, redirect to home
         const timer = setTimeout(() => {
-          router.push("/");
+          router.push(returnTo);
         }, 300);
         return () => clearTimeout(timer);
-      } else if (user && !profile) {
-        // User has stale session (no profile in DB), sign them out
-        supabase.auth.signOut();
       }
     }
-  }, [user, profile, loading, router, supabase]);
+  }, [user, profile, loading, router, returnTo]);
 
   /**
    * Initiates Google OAuth sign-in flow.
    * Redirects user to Google authentication page.
    */
   const handleSignIn = async () => {
+    setSigningIn(true); setSignInError(null);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(returnTo)}`,
         queryParams: {
           access_type: "offline",
           prompt: "consent",
@@ -68,7 +70,8 @@ function SignInContent() {
     });
 
     if (error) {
-      console.error("Error signing in:", error);
+      setSignInError("We couldn’t start sign-in. Please try again.");
+      setSigningIn(false);
     }
   };
 
@@ -150,12 +153,14 @@ function SignInContent() {
             {errorMessage && (
               <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
                 {errorMessage}
+                {user && <Button variant="link" onClick={refreshProfile}>Retry account</Button>}
               </div>
             )}
 
             {/* Sign in button */}
           <Button
             onClick={handleSignIn}
+            disabled={signingIn}
             size="lg"
               className="w-full h-14 text-base font-medium bg-white hover:bg-gray-50 text-foreground border border-gray-200 shadow-sm"
           >
@@ -177,7 +182,7 @@ function SignInContent() {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
               />
             </svg>
-              Continue with Google
+              {signingIn ? "Opening sign-in…" : "Continue with Google"}
           </Button>
           
             {/* Divider */}
